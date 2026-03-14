@@ -23,6 +23,12 @@ async def get_session_info() -> dict:
 
 
 @mcp.tool()
+async def get_full_state() -> dict:
+    """Get full session snapshot: transport + all tracks (with volume/pan/arm) + playing clips."""
+    return await client.get("/live/state")
+
+
+@mcp.tool()
 async def play() -> dict:
     """Start playback."""
     return await client.post("/live/transport/play")
