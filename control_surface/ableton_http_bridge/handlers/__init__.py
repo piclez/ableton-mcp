@@ -1,5 +1,6 @@
 """Route handlers for the HTTP bridge."""
 
+from .clips import register as register_clips
 from .devices import register as register_devices
 from .system import register as register_system
 from .tracks import register as register_tracks
@@ -11,3 +12,4 @@ def register_all(server):
     register_transport(server)
     register_tracks(server)
     register_devices(server)
+    register_clips(server)
