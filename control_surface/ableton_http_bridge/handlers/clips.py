@@ -31,6 +31,8 @@ def _clip_info(clip_id, clip_slot):
         "id": clip_id,
         "has_clip": True,
         "name": clip.name,
+        "color": clip.color,
+        "color_index": clip.color_index,
         "length": clip.length,
         "is_playing": clip.is_playing,
         "is_recording": clip.is_recording,
@@ -101,6 +103,19 @@ def register(server):
             return {"error": "missing 'name'"}
         clip.name = str(name)
         return {"status": "ok", "name": clip.name}
+
+    @server.route("POST", "/live/tracks/{track_id}/clips/{clip_id}/color")
+    def set_color(track_id, clip_id, body=None):
+        _, _, clip = _get_clip(track_id, clip_id)
+        if clip is None:
+            return {"error": f"clip {clip_id} not found on track {track_id}"}
+        if body and "color_index" in body:
+            clip.color_index = int(body["color_index"])
+        elif body and "color" in body:
+            clip.color = int(body["color"])
+        else:
+            return {"error": "missing 'color_index' or 'color'"}
+        return {"status": "ok", "color": clip.color, "color_index": clip.color_index}
 
     @server.route("POST", "/live/tracks/{track_id}/clips/{clip_id}/duplicate")
     def duplicate_clip(track_id, clip_id, body=None):

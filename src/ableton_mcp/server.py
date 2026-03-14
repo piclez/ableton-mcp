@@ -392,5 +392,173 @@ async def delete_scene(scene_id: int) -> dict:
     return await client.delete(f"/live/scenes/{scene_id}")
 
 
+# --- Return tracks ---
+
+
+@mcp.tool()
+async def list_returns() -> dict:
+    """List all return tracks with volume, pan, solo, mute, devices."""
+    return await client.get("/live/returns")
+
+
+@mcp.tool()
+async def get_return(return_id: int) -> dict:
+    """Get return track details including sends and devices."""
+    return await client.get(f"/live/returns/{return_id}")
+
+
+@mcp.tool()
+async def set_return_volume(return_id: int, value: float) -> dict:
+    """Set return track volume."""
+    return await client.post(f"/live/returns/{return_id}/volume", {"value": value})
+
+
+@mcp.tool()
+async def set_return_pan(return_id: int, value: float) -> dict:
+    """Set return track pan."""
+    return await client.post(f"/live/returns/{return_id}/pan", {"value": value})
+
+
+@mcp.tool()
+async def list_return_devices(return_id: int) -> dict:
+    """List devices on a return track."""
+    return await client.get(f"/live/returns/{return_id}/devices")
+
+
+@mcp.tool()
+async def list_return_device_parameters(return_id: int, device_id: int) -> dict:
+    """List parameters of a device on a return track."""
+    return await client.get(f"/live/returns/{return_id}/devices/{device_id}/parameters")
+
+
+@mcp.tool()
+async def set_return_device_parameter(
+    return_id: int, device_id: int, name: str, value: float
+) -> dict:
+    """Set a parameter on a return track device."""
+    return await client.post(
+        f"/live/returns/{return_id}/devices/{device_id}/parameters/{name}",
+        {"value": value},
+    )
+
+
+# --- Master track ---
+
+
+@mcp.tool()
+async def get_master() -> dict:
+    """Get master track info: volume, pan, devices."""
+    return await client.get("/live/master")
+
+
+@mcp.tool()
+async def set_master_volume(value: float) -> dict:
+    """Set master track volume."""
+    return await client.post("/live/master/volume", {"value": value})
+
+
+@mcp.tool()
+async def list_master_devices() -> dict:
+    """List devices on the master track."""
+    return await client.get("/live/master/devices")
+
+
+@mcp.tool()
+async def list_master_device_parameters(device_id: int) -> dict:
+    """List parameters of a device on the master track."""
+    return await client.get(f"/live/master/devices/{device_id}/parameters")
+
+
+@mcp.tool()
+async def set_master_device_parameter(device_id: int, name: str, value: float) -> dict:
+    """Set a parameter on a master track device."""
+    return await client.post(
+        f"/live/master/devices/{device_id}/parameters/{name}",
+        {"value": value},
+    )
+
+
+# --- Chains (racks) ---
+
+
+@mcp.tool()
+async def list_chains(track_id: int, device_id: int) -> dict:
+    """List chains in a rack device (Drum Rack, Instrument Rack, etc.)."""
+    return await client.get(f"/live/tracks/{track_id}/devices/{device_id}/chains")
+
+
+@mcp.tool()
+async def list_chain_device_parameters(
+    track_id: int, device_id: int, chain_id: int, chain_device_id: int
+) -> dict:
+    """List parameters of a device inside a chain."""
+    return await client.get(
+        f"/live/tracks/{track_id}/devices/{device_id}/chains/{chain_id}/devices/{chain_device_id}/parameters"
+    )
+
+
+@mcp.tool()
+async def set_chain_device_parameter(
+    track_id: int, device_id: int, chain_id: int, chain_device_id: int,
+    name: str, value: float
+) -> dict:
+    """Set a parameter on a device inside a chain."""
+    return await client.post(
+        f"/live/tracks/{track_id}/devices/{device_id}/chains/{chain_id}/devices/{chain_device_id}/parameters/{name}",
+        {"value": value},
+    )
+
+
+@mcp.tool()
+async def set_chain_device_parameters_batch(
+    track_id: int, device_id: int, chain_id: int, chain_device_id: int,
+    parameters: list[dict]
+) -> dict:
+    """Set multiple parameters on a device inside a chain."""
+    return await client.post(
+        f"/live/tracks/{track_id}/devices/{device_id}/chains/{chain_id}/devices/{chain_device_id}/parameters/batch",
+        parameters,
+    )
+
+
+@mcp.tool()
+async def list_drum_pads(track_id: int, device_id: int) -> dict:
+    """List visible drum pads in a Drum Rack with note, name, mute, solo."""
+    return await client.get(f"/live/tracks/{track_id}/devices/{device_id}/drum_pads")
+
+
+# --- Track creation ---
+
+
+@mcp.tool()
+async def create_midi_track(index: int = -1) -> dict:
+    """Create a new empty MIDI track. index=-1 adds at end."""
+    return await client.post("/live/tracks/create_midi", {"index": index})
+
+
+@mcp.tool()
+async def create_audio_track(index: int = -1) -> dict:
+    """Create a new empty audio track. index=-1 adds at end."""
+    return await client.post("/live/tracks/create_audio", {"index": index})
+
+
+@mcp.tool()
+async def delete_track(track_id: int) -> dict:
+    """Delete a track."""
+    return await client.delete(f"/live/tracks/{track_id}")
+
+
+# --- Clip color ---
+
+
+@mcp.tool()
+async def set_clip_color(track_id: int, clip_id: int, color_index: int) -> dict:
+    """Set a clip's color by Ableton color index (0-69)."""
+    return await client.post(
+        f"/live/tracks/{track_id}/clips/{clip_id}/color",
+        {"color_index": color_index},
+    )
+
+
 def main():
     mcp.run(transport="stdio")

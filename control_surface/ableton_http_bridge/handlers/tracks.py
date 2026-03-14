@@ -178,3 +178,147 @@ def register(server):
             if hasattr(track, "arm") and track.arm:
                 armed.append({"id": i, "name": track.name})
         return {"armed_tracks": armed}
+
+    # --- Return tracks ---
+
+    @server.route("GET", "/live/returns")
+    def list_returns(body=None):
+        song = util.song()
+        returns = []
+        for i, track in enumerate(song.return_tracks):
+            returns.append({
+                "id": i,
+                "name": track.name,
+                "solo": track.solo,
+                "mute": track.mute,
+                "volume": _param_value(track.mixer_device.volume),
+                "pan": _param_value(track.mixer_device.panning),
+                "device_count": len(track.devices),
+            })
+        return {"returns": returns}
+
+    @server.route("GET", "/live/returns/{return_id}")
+    def get_return(return_id, body=None):
+        song = util.song()
+        returns = list(song.return_tracks)
+        if return_id < 0 or return_id >= len(returns):
+            return {"error": f"return track {return_id} not found"}
+        track = returns[return_id]
+        return {
+            "id": return_id,
+            "name": track.name,
+            "solo": track.solo,
+            "mute": track.mute,
+            "volume": _param_value(track.mixer_device.volume),
+            "pan": _param_value(track.mixer_device.panning),
+            "sends": [
+                {"index": i, **_param_value(s)}
+                for i, s in enumerate(track.mixer_device.sends)
+            ],
+            "devices": [
+                {"id": i, "name": d.name, "class_name": d.class_name}
+                for i, d in enumerate(track.devices)
+            ],
+        }
+
+    @server.route("POST", "/live/returns/{return_id}/volume")
+    def set_return_volume(return_id, body=None):
+        song = util.song()
+        returns = list(song.return_tracks)
+        if return_id < 0 or return_id >= len(returns):
+            return {"error": f"return track {return_id} not found"}
+        value = body.get("value") if body else None
+        if value is None:
+            return {"error": "missing 'value'"}
+        returns[return_id].mixer_device.volume.value = float(value)
+        return {"status": "ok", "volume": _param_value(returns[return_id].mixer_device.volume)}
+
+    @server.route("POST", "/live/returns/{return_id}/pan")
+    def set_return_pan(return_id, body=None):
+        song = util.song()
+        returns = list(song.return_tracks)
+        if return_id < 0 or return_id >= len(returns):
+            return {"error": f"return track {return_id} not found"}
+        value = body.get("value") if body else None
+        if value is None:
+            return {"error": "missing 'value'"}
+        returns[return_id].mixer_device.panning.value = float(value)
+        return {"status": "ok", "pan": _param_value(returns[return_id].mixer_device.panning)}
+
+    @server.route("POST", "/live/returns/{return_id}/solo")
+    def set_return_solo(return_id, body=None):
+        song = util.song()
+        returns = list(song.return_tracks)
+        if return_id < 0 or return_id >= len(returns):
+            return {"error": f"return track {return_id} not found"}
+        solo = body.get("solo", not returns[return_id].solo) if body else not returns[return_id].solo
+        returns[return_id].solo = bool(solo)
+        return {"status": "ok", "solo": returns[return_id].solo}
+
+    @server.route("POST", "/live/returns/{return_id}/mute")
+    def set_return_mute(return_id, body=None):
+        song = util.song()
+        returns = list(song.return_tracks)
+        if return_id < 0 or return_id >= len(returns):
+            return {"error": f"return track {return_id} not found"}
+        mute = body.get("mute", not returns[return_id].mute) if body else not returns[return_id].mute
+        returns[return_id].mute = bool(mute)
+        return {"status": "ok", "mute": returns[return_id].mute}
+
+    # --- Master track ---
+
+    @server.route("GET", "/live/master")
+    def get_master(body=None):
+        master = util.song().master_track
+        return {
+            "name": master.name,
+            "volume": _param_value(master.mixer_device.volume),
+            "pan": _param_value(master.mixer_device.panning),
+            "device_count": len(master.devices),
+            "devices": [
+                {"id": i, "name": d.name, "class_name": d.class_name}
+                for i, d in enumerate(master.devices)
+            ],
+        }
+
+    @server.route("POST", "/live/master/volume")
+    def set_master_volume(body=None):
+        master = util.song().master_track
+        value = body.get("value") if body else None
+        if value is None:
+            return {"error": "missing 'value'"}
+        master.mixer_device.volume.value = float(value)
+        return {"status": "ok", "volume": _param_value(master.mixer_device.volume)}
+
+    @server.route("POST", "/live/master/pan")
+    def set_master_pan(body=None):
+        master = util.song().master_track
+        value = body.get("value") if body else None
+        if value is None:
+            return {"error": "missing 'value'"}
+        master.mixer_device.panning.value = float(value)
+        return {"status": "ok", "pan": _param_value(master.mixer_device.panning)}
+
+    # --- Create / delete tracks ---
+
+    @server.route("POST", "/live/tracks/create_midi")
+    def create_midi_track(body=None):
+        song = util.song()
+        index = body.get("index", -1) if body else -1
+        song.create_midi_track(index)
+        return {"status": "ok", "track_count": len(song.tracks)}
+
+    @server.route("POST", "/live/tracks/create_audio")
+    def create_audio_track(body=None):
+        song = util.song()
+        index = body.get("index", -1) if body else -1
+        song.create_audio_track(index)
+        return {"status": "ok", "track_count": len(song.tracks)}
+
+    @server.route("DELETE", "/live/tracks/{track_id}")
+    def delete_track(track_id, body=None):
+        song = util.song()
+        if track_id < 0 or track_id >= len(song.tracks):
+            return {"error": f"track {track_id} not found"}
+        song.delete_track(track_id)
+        return {"status": "ok", "track_count": len(song.tracks)}
