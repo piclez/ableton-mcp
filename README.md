@@ -18,23 +18,17 @@ pip install -e .
 
 ### 2. Install the Control Surface
 
-Symlink (recommended — changes apply immediately):
+Copy `ableton_http_bridge` into `Remote Scripts` direcotry in `User Library`:
 
 ```bash
-ln -s "$(pwd)/control_surface/ableton_http_bridge" "~/Music/Ableton/User Library/Remote Scripts/"
-```
-
-Or copy manually:
-
-```bash
-cp -r control_surface/ableton_http_bridge "~/Music/Ableton/User Library/Remote Scripts/"
+cp -r control_surface/ableton_http_bridge  ~/Music/Ableton/User\ Library/Remote\ Scripts/
 ```
 
 Then in Ableton: **Preferences → Link, Tempo & MIDI → Control Surface** → select `ableton_http_bridge`.
 
 ### 3. Configure Claude
 
-Add to your MCP client config:
+Add to your MCP client config (replace `/absolute/path/to/ableton-mcp` with path to this repository):
 
 ```json
 {
