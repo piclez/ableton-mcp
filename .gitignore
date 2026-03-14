@@ -1,0 +1,7 @@
+dist/
+build/
+.DS_Store
+
+# Reference files (not part of project)
+ableton*.md
+ableton-api-copy
