@@ -10,6 +10,7 @@ import logging
 
 from ableton.v3.control_surface import ControlSurface, ControlSurfaceSpecification, ElementsBase
 
+from .handlers import register_all
 from .http_server import BridgeServer
 
 logger = logging.getLogger(__name__)
@@ -35,28 +36,10 @@ class AbletonHttpBridge(ControlSurface):
     def setup(self):
         super().setup()
         self._http = BridgeServer(schedule_message=self.schedule_message)
-        self._register_routes()
+        register_all(self._http)
         self._http.start()
         logger.info("AbletonHttpBridge started")
 
     def disconnect(self):
         self._http.stop()
         super().disconnect()
-
-    def _register_routes(self):
-        @self._http.route("GET", "/live/ping")
-        def ping(body=None):
-            return {"status": "ok"}
-
-        @self._http.route("GET", "/live/info")
-        def info(body=None):
-            from ableton.v3.live import util
-            song = util.song()
-            return {
-                "tempo": song.tempo,
-                "signature_numerator": song.signature_numerator,
-                "signature_denominator": song.signature_denominator,
-                "track_count": len(song.tracks),
-                "scene_count": len(song.scenes),
-                "is_playing": song.is_playing,
-            }
