@@ -5,3 +5,4 @@ build/
 # Reference files (not part of project)
 ableton*.md
 ableton-api-copy
+install.sh
