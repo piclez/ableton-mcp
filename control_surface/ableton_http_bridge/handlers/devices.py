@@ -69,20 +69,6 @@ def register(server):
             "parameters": [_param_info(p) for p in device.parameters],
         }
 
-    @server.route("POST", "/live/tracks/{track_id}/devices/{device_id}/parameters/{name}")
-    def set_parameter(track_id, device_id, name, body=None):
-        _, device = _get_device(track_id, device_id)
-        if device is None:
-            return {"error": f"device {device_id} not found on track {track_id}"}
-        value = body.get("value") if body else None
-        if value is None:
-            return {"error": "missing 'value'"}
-        for param in device.parameters:
-            if param.name == name:
-                param.value = float(value)
-                return {"status": "ok", **_param_info(param)}
-        return {"error": f"parameter '{name}' not found"}
-
     @server.route("POST", "/live/tracks/{track_id}/devices/{device_id}/parameters/batch")
     def set_parameters_batch(track_id, device_id, body=None):
         _, device = _get_device(track_id, device_id)
@@ -101,6 +87,20 @@ def register(server):
             else:
                 results.append({"status": "error", "name": name, "error": "not found or missing value"})
         return {"results": results}
+
+    @server.route("POST", "/live/tracks/{track_id}/devices/{device_id}/parameters/{name}")
+    def set_parameter(track_id, device_id, name, body=None):
+        _, device = _get_device(track_id, device_id)
+        if device is None:
+            return {"error": f"device {device_id} not found on track {track_id}"}
+        value = body.get("value") if body else None
+        if value is None:
+            return {"error": "missing 'value'"}
+        for param in device.parameters:
+            if param.name == name:
+                param.value = float(value)
+                return {"status": "ok", **_param_info(param)}
+        return {"error": f"parameter '{name}' not found"}
 
     @server.route("POST", "/live/tracks/{track_id}/devices/{device_id}/enabled")
     def set_enabled(track_id, device_id, body=None):

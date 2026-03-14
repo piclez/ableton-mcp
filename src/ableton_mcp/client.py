@@ -3,6 +3,10 @@
 import httpx
 
 
+class AbletonError(Exception):
+    """Raised when communication with Ableton fails."""
+
+
 class AbletonClient:
     """HTTP client that talks to the Control Surface HTTP server running inside Ableton."""
 
@@ -10,25 +14,39 @@ class AbletonClient:
         self.base_url = f"http://{host}:{port}"
         self._client = httpx.AsyncClient(base_url=self.base_url, timeout=10.0)
 
-    async def ping(self) -> dict:
-        resp = await self._client.get("/live/ping")
-        resp.raise_for_status()
+    async def _request(self, method: str, path: str, data=None) -> dict:
+        try:
+            resp = await self._client.request(method, path, json=data)
+        except httpx.ConnectError:
+            raise AbletonError(
+                "Cannot connect to Ableton. Is Live running with the "
+                "ableton_http_bridge Control Surface enabled?"
+            )
+        except httpx.TimeoutException:
+            raise AbletonError(
+                "Ableton did not respond in time. The operation may be too "
+                "heavy or Live is unresponsive."
+            )
+        if resp.status_code >= 400:
+            try:
+                body = resp.json()
+                msg = body.get("error", resp.text)
+            except Exception:
+                msg = resp.text
+            raise AbletonError(f"Ableton returned error: {msg}")
         return resp.json()
+
+    async def ping(self) -> dict:
+        return await self._request("GET", "/live/ping")
 
     async def get(self, path: str) -> dict:
-        resp = await self._client.get(path)
-        resp.raise_for_status()
-        return resp.json()
+        return await self._request("GET", path)
 
-    async def post(self, path: str, data: dict | None = None) -> dict:
-        resp = await self._client.post(path, json=data or {})
-        resp.raise_for_status()
-        return resp.json()
+    async def post(self, path: str, data=None) -> dict:
+        return await self._request("POST", path, data or {})
 
-    async def delete(self, path: str, data: dict | None = None) -> dict:
-        resp = await self._client.request("DELETE", path, json=data or {})
-        resp.raise_for_status()
-        return resp.json()
+    async def delete(self, path: str, data=None) -> dict:
+        return await self._request("DELETE", path, data or {})
 
     async def close(self):
         await self._client.aclose()
