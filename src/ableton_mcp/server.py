@@ -1,6 +1,7 @@
 """Ableton MCP server — exposes Ableton Live control as MCP tools."""
 
 import os
+from urllib.parse import unquote
 
 from mcp.server.fastmcp import FastMCP
 
@@ -327,7 +328,7 @@ async def set_parameter(track_id: int, device_id: int, name: str, value: float) 
     Prefer set_parameters_batch() when setting 2 or more parameters at once.
     """
     return await client.post(
-        f"/live/tracks/{track_id}/devices/{device_id}/parameters/{name}",
+        f"/live/tracks/{track_id}/devices/{device_id}/parameters/{unquote(name)}",
         {"value": value},
     )
 
@@ -685,7 +686,7 @@ async def set_return_device_parameter(
     Returns {"status": "ok", "name": str, "value": float, "display": str, "min": float, "max": float}.
     """
     return await client.post(
-        f"/live/returns/{return_id}/devices/{device_id}/parameters/{name}",
+        f"/live/returns/{return_id}/devices/{device_id}/parameters/{unquote(name)}",
         {"value": value},
     )
 
@@ -743,7 +744,7 @@ async def set_master_device_parameter(device_id: int, name: str, value: float) -
     Returns {"status": "ok", "name": str, "value": float, "display": str, "min": float, "max": float}.
     """
     return await client.post(
-        f"/live/master/devices/{device_id}/parameters/{name}",
+        f"/live/master/devices/{device_id}/parameters/{unquote(name)}",
         {"value": value},
     )
 
@@ -793,7 +794,7 @@ async def set_chain_device_parameter(
     Returns {"status": "ok", "name": str, "value": float, "display": str, "min": float, "max": float}.
     """
     return await client.post(
-        f"/live/tracks/{track_id}/devices/{device_id}/chains/{chain_id}/devices/{chain_device_id}/parameters/{name}",
+        f"/live/tracks/{track_id}/devices/{device_id}/chains/{chain_id}/devices/{chain_device_id}/parameters/{unquote(name)}",
         {"value": value},
     )
 
