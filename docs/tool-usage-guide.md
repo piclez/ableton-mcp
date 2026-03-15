@@ -152,3 +152,125 @@ All tools return `{"error": "..."}` on failure. Common causes:
 | `no empty clip slot` | Track has no free slots; duplicate track or use a different track |
 | `cannot delete last scene` | At least one scene must always exist |
 | `does not support chains` | Device is not a rack type |
+
+---
+
+## All available tools
+
+### Transport & session
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `get_session_info` | — | Current transport state (BPM, playing, position, etc.) |
+| `get_full_state` | — | Full session snapshot in one call |
+| `play` | — | Start playback |
+| `stop` | — | Stop playback |
+| `record` | — | Toggle session record mode |
+| `set_bpm` | `bpm` | Set tempo |
+| `set_loop` | `enabled`, `start`, `length` | Set arrangement loop |
+| `set_metronome` | `enabled` | Set or toggle metronome |
+| `jump_to_position` | `position` | Move playhead (beats) |
+| `undo` | — | Undo last action |
+| `redo` | — | Redo last undone action |
+
+### Tracks
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `list_tracks` | — | List all MIDI/audio tracks |
+| `get_track` | `track_id` | Details for one track including sends |
+| `create_midi_track` | `index=-1` | Create a new MIDI track |
+| `create_audio_track` | `index=-1` | Create a new audio track |
+| `delete_track` | `track_id` | Delete a track (use `undo` to recover) |
+| `duplicate_track` | `track_id` | Duplicate a track |
+| `rename_track` | `track_id`, `name` | Rename a track |
+| `select_track` | `track_id` | Select/highlight a track in the GUI |
+| `set_track_volume` | `track_id`, `value` | Volume (0.85 = 0 dB) |
+| `set_track_pan` | `track_id`, `value` | Pan (−1.0 left … 1.0 right) |
+| `set_track_arm` | `track_id`, `armed` | Arm/disarm for recording |
+| `set_track_solo` | `track_id`, `solo` | Solo on/off |
+| `set_track_mute` | `track_id`, `mute` | Mute on/off |
+| `set_track_send` | `track_id`, `send_index`, `value` | Set a send level |
+| `stop_track` | `track_id` | Stop all playing clips on a track |
+| `get_playing_clips` | — | List currently playing clips |
+| `get_armed_tracks` | — | List currently armed tracks |
+
+### Clips
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `list_clips` | `track_id` | List clips on a track |
+| `get_clip` | `track_id`, `clip_id` | Details for a clip slot |
+| `create_midi_clip` | `track_id`, `length=4.0`, `name=""` | Create empty MIDI clip |
+| `duplicate_clip` | `track_id`, `clip_id` | Duplicate to next empty slot |
+| `duplicate_loop` | `track_id`, `clip_id` | Double loop content (clip × 2) |
+| `rename_clip` | `track_id`, `clip_id`, `name` | Rename a clip |
+| `set_clip_color` | `track_id`, `clip_id`, `color_index` | Set clip color (0–69) |
+| `set_clip_loop` | `track_id`, `clip_id`, `start`, `end`, `enabled` | Set clip loop points |
+| `extend_clip_loop` | `track_id`, `clip_id`, `bars=1` | Extend loop end by N bars |
+| `fire_clip` | `track_id`, `clip_id` | Launch a clip |
+| `stop_clip` | `track_id`, `clip_id` | Stop a clip |
+
+### MIDI notes
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `get_clip_notes` | `track_id`, `clip_id` | Get all notes from a clip |
+| `add_notes_to_clip` | `track_id`, `clip_id`, `notes` | Add notes (pitch, time, duration, velocity) |
+| `clear_clip` | `track_id`, `clip_id` | Remove all notes from a clip |
+| `delete_notes_by_pitch` | `track_id`, `clip_id`, `pitches` | Delete notes by pitch list |
+| `delete_notes_in_range` | `track_id`, `clip_id`, `start`, `end` | Delete notes in beat range |
+
+### Devices — regular tracks
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `list_devices` | `track_id` | List devices on a track |
+| `list_parameters` | `track_id`, `device_id` | List device parameters |
+| `set_parameter` | `track_id`, `device_id`, `name`, `value` | Set one parameter |
+| `set_parameters_batch` | `track_id`, `device_id`, `parameters` | Set multiple parameters at once |
+| `set_device_enabled` | `track_id`, `device_id`, `enabled` | Bypass/enable a device |
+
+### Devices — racks & chains
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `list_chains` | `track_id`, `device_id` | List chains in a rack |
+| `list_chain_device_parameters` | `track_id`, `device_id`, `chain_id`, `chain_device_id` | List parameters of a device inside a chain |
+| `set_chain_device_parameter` | `track_id`, `device_id`, `chain_id`, `chain_device_id`, `name`, `value` | Set one chain device parameter |
+| `set_chain_device_parameters_batch` | `track_id`, `device_id`, `chain_id`, `chain_device_id`, `parameters` | Set multiple chain device parameters |
+| `list_drum_pads` | `track_id`, `device_id` | List drum pads in a Drum Rack |
+
+### Return tracks
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `list_returns` | — | List all return tracks |
+| `get_return` | `return_id` | Return track details |
+| `set_return_volume` | `return_id`, `value` | Volume (0.85 = 0 dB) |
+| `set_return_pan` | `return_id`, `value` | Pan |
+| `list_return_devices` | `return_id` | List devices on a return |
+| `list_return_device_parameters` | `return_id`, `device_id` | List parameters |
+| `set_return_device_parameter` | `return_id`, `device_id`, `name`, `value` | Set one parameter |
+
+### Master track
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `get_master` | — | Master track info |
+| `set_master_volume` | `value` | Volume (0.85 = 0 dB) |
+| `list_master_devices` | — | List master track devices |
+| `list_master_device_parameters` | `device_id` | List parameters |
+| `set_master_device_parameter` | `device_id`, `name`, `value` | Set one parameter |
+
+### Scenes
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `list_scenes` | — | List all scenes |
+| `create_scene` | `name=""` | Create a new scene |
+| `delete_scene` | `scene_id` | Delete a scene |
+| `duplicate_scene` | `scene_id` | Duplicate a scene |
+| `rename_scene` | `scene_id`, `name` | Rename a scene |
+| `fire_scene` | `scene_id` | Launch all clips in a scene |
+| `select_scene` | `scene_id` | Select/highlight a scene in the GUI |
