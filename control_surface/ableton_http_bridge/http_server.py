@@ -118,7 +118,8 @@ class MainThreadDispatcher:
         event = threading.Event()
         self._queue.put((fn, kwargs, event, result_holder))
         self._ensure_polling()
-        event.wait(timeout=10.0)
+        if not event.wait(timeout=10.0):
+            logger.warning("Timeout waiting for %s on main thread", fn.__name__)
         if "error" in result_holder:
             raise result_holder["error"]
         return result_holder.get("result")
@@ -135,6 +136,7 @@ class MainThreadDispatcher:
                 try:
                     holder["result"] = fn(**kwargs)
                 except Exception as e:
+                    logger.exception("Handler error in %s", fn.__name__)
                     holder["error"] = e
                 finally:
                     event.set()
@@ -176,4 +178,5 @@ class BridgeServer:
     def stop(self):
         if self._server:
             self._server.shutdown()
+            self._server.server_close()
             logger.info("HTTP bridge stopped")
