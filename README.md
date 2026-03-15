@@ -44,6 +44,8 @@ Add to your MCP client config (replace `/absolute/path/to/ableton-mcp` with path
 
 Start Ableton Live with the Control Surface enabled, then use Claude with the MCP server to control it — set tempo, play/stop, manipulate clips, tweak device parameters, and more.
 
+See [docs/tool-usage-guide.md](docs/tool-usage-guide.md) for a detailed guide on how to use the tools correctly, including workflows for device parameters, MIDI notes, and rack chains.
+
 ## Requirements
 
 - Python 3.11+
