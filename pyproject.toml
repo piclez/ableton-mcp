@@ -39,6 +39,7 @@ dev = [
     "pytest-anyio>=0.0.0",
     "anyio[trio]>=4.0",
     "respx>=0.21",
+    "ruff>=0.4",
 ]
 
 [tool.pytest.ini_options]

@@ -14,5 +14,5 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -e ".[dev]"
-      - run: ruff check .
+      - run: python -m ruff check .
       - run: python -m pytest tests/ -v
