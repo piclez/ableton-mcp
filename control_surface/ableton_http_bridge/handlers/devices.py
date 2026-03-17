@@ -307,6 +307,203 @@ def register(server):
                 return {"status": "ok", **_param_info(param)}
         return {"error": f"parameter '{name}' not found"}
 
+    # --- Load device from browser ---
+
+    @server.route("POST", "/live/tracks/{track_id}/devices/load")
+    def load_device(track_id, body=None):
+        import Live
+        name = (body or {}).get("name", "").strip()
+        uri = (body or {}).get("uri", "").strip()
+        if not name and not uri:
+            return {"error": "missing 'name' or 'uri'"}
+        song = util.song()
+        track = _get_track(track_id)
+        if track is None:
+            return {"error": f"track {track_id} not found"}
+        song.view.selected_track = track
+        app = Live.Application.get_application()
+        browser = app.browser
+        search_order = [
+            browser.instruments,
+            browser.audio_effects,
+            browser.midi_effects,
+            browser.drums,
+            browser.plugins,
+            browser.max_for_live,
+        ]
+        def _matches(item):
+            if uri:
+                return item.uri == uri
+            return item.name.lower() == name.lower()
+        def _bfs(root, max_depth=3):
+            from collections import deque
+            queue = deque([(root, 0)])
+            while queue:
+                item, depth = queue.popleft()
+                try:
+                    if item.is_loadable and _matches(item):
+                        return item
+                except Exception:
+                    pass
+                if depth < max_depth:
+                    try:
+                        for child in item.children:
+                            queue.append((child, depth + 1))
+                    except Exception:
+                        pass
+            return None
+        found = None
+        for root in search_order:
+            found = _bfs(root)
+            if found:
+                break
+        if found is None:
+            return {"error": f"device '{name or uri}' not found in browser"}
+        before = len(list(track.devices))
+        try:
+            browser.load_item(found)
+        except Exception as e:
+            return {"error": f"load_item failed: {e}"}
+        after = len(list(track.devices))
+        if after <= before:
+            return {"error": "load completed but no device was added — wrong track type?"}
+        new_device = list(track.devices)[after - 1]
+        return {"status": "ok", "device": _device_info(after - 1, new_device)}
+
+    @server.route("POST", "/live/tracks/{track_id}/devices/preset")
+    def load_preset(track_id, body=None):
+        import Live
+        path = (body or {}).get("path", "").strip()
+        if not path:
+            return {"error": "missing 'path'"}
+        song = util.song()
+        track = _get_track(track_id)
+        if track is None:
+            return {"error": f"track {track_id} not found"}
+        song.view.selected_track = track
+        app = Live.Application.get_application()
+        browser = app.browser
+        search_name = path.lower()
+        search_order = [
+            browser.user_library,
+            browser.user_folders,
+            browser.instruments,
+            browser.audio_effects,
+            browser.midi_effects,
+            browser.drums,
+            browser.packs,
+        ]
+        def _matches(item):
+            n = item.name.lower()
+            return n == search_name or n == search_name.rsplit(".", 1)[0].lower()
+        def _bfs(root, max_depth=5):
+            from collections import deque
+            queue = deque([(root, 0)])
+            while queue:
+                item, depth = queue.popleft()
+                try:
+                    if item.is_loadable and _matches(item):
+                        return item
+                except Exception:
+                    pass
+                if depth < max_depth:
+                    try:
+                        for child in item.children:
+                            queue.append((child, depth + 1))
+                    except Exception:
+                        pass
+            return None
+        found = None
+        for root in search_order:
+            try:
+                found = _bfs(root)
+            except Exception:
+                pass
+            if found:
+                break
+        if found is None:
+            return {"error": f"preset '{path}' not found in browser"}
+        before = len(list(track.devices))
+        try:
+            browser.load_item(found)
+        except Exception as e:
+            return {"error": f"load_item failed: {e}"}
+        after = len(list(track.devices))
+        if after <= before:
+            return {"error": "load completed but no device was added"}
+        new_device = list(track.devices)[after - 1]
+        return {"status": "ok", "device": _device_info(after - 1, new_device)}
+
+    @server.route("POST", "/live/tracks/{track_id}/devices/{device_id}/drum_pads/{pad_note}/sample")
+    def add_drum_pad_sample(track_id, device_id, pad_note, body=None):
+        import Live
+        path = (body or {}).get("path", "").strip()
+        if not path:
+            return {"error": "missing 'path'"}
+        _, device = _get_device(track_id, device_id)
+        if device is None:
+            return {"error": f"device {device_id} not found on track {track_id}"}
+        if not device.can_have_drum_pads:
+            return {"error": f"device '{device.name}' does not have drum pads"}
+        pad = next((p for p in device.drum_pads if p.note == pad_note), None)
+        if pad is None:
+            return {"error": f"pad note {pad_note} not found"}
+        track = _get_track(track_id)
+        song = util.song()
+        song.view.selected_track = track
+        app = Live.Application.get_application()
+        browser = app.browser
+        filename = path.split("/")[-1].lower()
+        def _matches(item):
+            return item.name.lower() == filename or item.name.lower() == filename.rsplit(".", 1)[0].lower()
+        def _bfs(root, max_depth=5):
+            from collections import deque
+            queue = deque([(root, 0)])
+            while queue:
+                item, depth = queue.popleft()
+                try:
+                    if item.is_loadable and _matches(item):
+                        return item
+                except Exception:
+                    pass
+                if depth < max_depth:
+                    try:
+                        for child in item.children:
+                            queue.append((child, depth + 1))
+                    except Exception:
+                        pass
+            return None
+        found = None
+        for root in [browser.user_library, browser.user_folders, browser.samples, browser.packs]:
+            try:
+                found = _bfs(root)
+            except Exception:
+                pass
+            if found:
+                break
+        if found is None:
+            return {"error": f"sample '{path}' not found in browser"}
+        # Select the pad's chain in the view so load_item targets this pad
+        try:
+            song.view.selected_track = track
+            device.view.selected_drum_pad = pad
+        except Exception:
+            pass
+        chains_before = len(list(pad.chains))
+        try:
+            browser.load_item(found)
+        except Exception as e:
+            return {"error": f"load_item failed: {e}"}
+        chains_after = len(list(pad.chains))
+        if chains_after <= chains_before and chains_after == 0:
+            return {"error": "load completed but no sample was added to pad"}
+        return {
+            "status": "ok",
+            "pad_note": pad_note,
+            "pad_name": pad.name,
+            "sample": path,
+        }
+
     # --- Master track devices ---
 
     @server.route("GET", "/live/master/devices")

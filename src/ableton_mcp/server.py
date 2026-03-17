@@ -52,6 +52,57 @@ async def get_session_info() -> dict:
 
 
 @mcp.tool()
+async def describe_session_structure() -> dict:
+    """Get a semantic summary of the project: BPM, genre guess, energy, density, and per-track roles.
+
+    Use this instead of get_full_state() or list_tracks() when you need to understand the musical
+    purpose of each track (e.g. to generate a bassline on the bass track, or build drums on the
+    drum track) without guessing from raw track names.
+
+    Returns:
+        bpm: float
+        genre_guess: str — e.g. "techno", "house", "hiphop", "dnb", "trance", "trap", "unknown"
+        energy_level: "low" | "medium" | "high"
+        density: "low" | "medium" | "high" — how many distinct musical roles are filled
+        tracks: list of:
+            id: int — use as track_id in all other tools
+            name: str
+            type: "midi" | "audio"
+            devices: list[str] — class_name of each device (e.g. "Operator", "DrumGroupDevice")
+            clip_count: int — number of clips on this track
+            active_clips: list of {"id": int, "name": str} — currently playing clips
+            mute: bool
+            solo: bool
+            role: "drums" | "bass" | "lead" | "chord" | "vocal" | "fx" | "guitar" | "brass" | "unknown"
+            subrole: "kick" | "snare" | "hihat" | "perc" | null
+    """
+    return await client.get("/live/session/structure")
+
+
+@mcp.tool()
+async def get_browser_info() -> dict:
+    """Introspect the Ableton browser object — lists available categories and their child counts.
+
+    Use this to verify the browser API is working and to discover what categories are available
+    (instruments, audio_effects, midi_effects, drums, samples, plugins, user_library, etc.).
+    Returns: members (all browser attributes), categories (dict with child counts), has_load_item (bool).
+    """
+    return await client.get("/live/browser/info")
+
+
+@mcp.tool()
+async def browse_devices(category: str) -> dict:
+    """Browse the Ableton device browser tree for a given category.
+
+    category: str — one of: instruments, audio_effects, midi_effects, drums,
+                             samples, clips, packs, user_library, plugins, max_for_live
+    Returns a tree of folders and loadable items (name, is_folder, is_loadable, children).
+    Use this to discover exact device names before calling load_device().
+    """
+    return await client.get(f"/live/browser/tree/{category}")
+
+
+@mcp.tool()
 async def get_full_state() -> dict:
     """Get a full snapshot of the entire session in one call.
 
@@ -272,6 +323,63 @@ async def get_armed_tracks() -> dict:
 
 
 # --- Devices ---
+
+
+@mcp.tool()
+async def load_device(track_id: int, name: str = "", uri: str = "") -> dict:
+    """Load a device from the Ableton browser onto a track.
+
+    track_id: int — from list_tracks().
+    name: str — exact device name as shown in browse_devices() (e.g. "Reverb", "Wavetable", "Drum Rack").
+    uri: str — optional, exact URI from browse_devices() — use instead of name for precise matching.
+
+    Searches instruments → audio_effects → midi_effects → drums → plugins in order.
+    Returns {"status": "ok", "device": {"id": int, "name": str, "class_name": str}}.
+
+    Use create_drum_rack() as a shortcut for loading a Drum Rack.
+    """
+    return await client.post(f"/live/tracks/{track_id}/devices/load", {"name": name, "uri": uri})
+
+
+@mcp.tool()
+async def create_drum_rack(track_id: int) -> dict:
+    """Load an empty Drum Rack onto a MIDI track.
+
+    track_id: int — from list_tracks(). Must be a MIDI track.
+    Returns {"status": "ok", "device": {"id": int, "name": str, "class_name": str}}.
+    """
+    return await client.post(f"/live/tracks/{track_id}/devices/load", {"name": "Drum Rack"})
+
+
+@mcp.tool()
+async def load_preset(track_id: int, path: str) -> dict:
+    """Load a preset (.adv, .adg, .vstpreset, etc.) onto a track by filename.
+
+    track_id: int — from list_tracks().
+    path: str — filename or name without extension (e.g. "My Reverb.adv", "My Reverb").
+              Searches user_library → user_folders → instruments → audio_effects →
+              midi_effects → drums → packs.
+    Returns {"status": "ok", "device": {"id": int, "name": str, "class_name": str}}.
+    """
+    return await client.post(f"/live/tracks/{track_id}/devices/preset", {"path": path})
+
+
+@mcp.tool()
+async def add_drum_pad_sample(track_id: int, device_id: int, pad_note: int, path: str) -> dict:
+    """Load a sample onto a specific drum pad in a Drum Rack.
+
+    track_id: int — from list_tracks().
+    device_id: int — from list_devices(), must be a DrumGroupDevice (Drum Rack).
+    pad_note: int — MIDI note number of the pad (e.g. 36 = C1 = kick).
+                    Use list_drum_pads() to see available pads and their notes.
+    path: str — sample filename (e.g. "Kick Azimuth.wav"). Searches user_library →
+                user_folders → samples → packs.
+    Returns {"status": "ok", "pad_note": int, "pad_name": str, "sample": str}.
+    """
+    return await client.post(
+        f"/live/tracks/{track_id}/devices/{device_id}/drum_pads/{pad_note}/sample",
+        {"path": path},
+    )
 
 
 @mcp.tool()
