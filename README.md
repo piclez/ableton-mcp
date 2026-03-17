@@ -1,10 +1,25 @@
 # ableton-mcp
 
-MCP server + Ableton Control Surface for controlling Ableton Live via Claude.
+Control Ableton Live with Claude. An MCP server + Ableton Control Surface that exposes the full Live API over HTTP, so an AI assistant can manipulate your session in real time.
 
 ```
-Claude (MCP client) ↔ ableton-mcp (Python MCP server) ↔ HTTP ↔ Control Surface ↔ Ableton Live
+Claude ↔ ableton-mcp (MCP server) ↔ HTTP ↔ Control Surface ↔ Ableton Live
 ```
+
+## What you can do
+
+- **Compose** — create clips, write MIDI notes, build drum patterns, arrange on the timeline
+- **Sound design** — load instruments and effects, tweak every parameter by name, build rack chains
+- **Mix** — set volumes, pans, sends, automate parameters with clip envelopes
+- **Navigate** — play, stop, fire scenes, jump to cue points, control the transport
+- **Explore** — browse the device library, load presets, add samples to drum pads
+
+135+ tools covering tracks, clips, devices, scenes, arrangement view, and automation envelopes.
+
+## Requirements
+
+- Python 3.11+
+- Ableton Live 11 or 12 (Suite or Standard with Control Surface support)
 
 ## Setup
 
@@ -12,23 +27,21 @@ Claude (MCP client) ↔ ableton-mcp (Python MCP server) ↔ HTTP ↔ Control Sur
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
 ### 2. Install the Control Surface
 
-Copy `ableton_http_bridge` into `Remote Scripts` direcotry in `User Library`:
-
 ```bash
-cp -r control_surface/ableton_http_bridge  ~/Music/Ableton/User\ Library/Remote\ Scripts/
+cp -r control_surface/ableton_http_bridge ~/Music/Ableton/User\ Library/Remote\ Scripts/
 ```
 
 Then in Ableton: **Preferences → Link, Tempo & MIDI → Control Surface** → select `ableton_http_bridge`.
 
 ### 3. Configure Claude
 
-Add to your MCP client config (replace `/absolute/path/to/ableton-mcp` with path to this repository):
+Add to your MCP client config (e.g. `claude_desktop_config.json`):
 
 ```json
 {
@@ -40,13 +53,26 @@ Add to your MCP client config (replace `/absolute/path/to/ableton-mcp` with path
 }
 ```
 
-## Usage
+Replace `/absolute/path/to/ableton-mcp` with the actual path to this repository.
 
-Start Ableton Live with the Control Surface enabled, then use Claude with the MCP server to control it — set tempo, play/stop, manipulate clips, tweak device parameters, and more.
+## Example
 
-See [docs/tool-usage-guide.md](docs/tool-usage-guide.md) for a detailed guide on how to use the tools correctly, including workflows for device parameters, MIDI notes, and rack chains.
+Here's what you can ask Claude:
 
-## Requirements
+> *"Create a 4-bar drum pattern on track 1 with a kick on beats 1 and 3, snare on 2 and 4, and a 16th-note hi-hat groove"*
 
-- Python 3.11+
-- Ableton Live (with Control Surface support)
+> *"Load Wavetable on the Bass track, set the filter to 400 Hz with 60% resonance, and automate the cutoff to sweep from 200 Hz to 8 kHz over 8 bars"*
+
+> *"Duplicate the current scene, rename it 'Chorus', and fire it"*
+
+## Documentation
+
+- [Tool usage guide](docs/tool-usage-guide.md) — workflows, parameter conventions, common mistakes, all 135+ tools
+
+## Architecture
+
+The Control Surface runs inside Ableton's embedded Python 3.11 (stdlib only, no pip). It starts a local HTTP server on port 39991 in a daemon thread; all Live API calls are scheduled back to the main thread via `_ControlSurface__component_guard`. The external MCP server communicates with it over HTTP using `httpx`.
+
+## License
+
+MIT
