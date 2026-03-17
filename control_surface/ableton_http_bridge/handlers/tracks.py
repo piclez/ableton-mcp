@@ -265,6 +265,37 @@ def register(server):
         returns[return_id].mute = bool(mute)
         return {"status": "ok", "mute": returns[return_id].mute}
 
+    @server.route("POST", "/live/returns/create")
+    def create_return_track(body=None):
+        song = util.song()
+        before = len(list(song.return_tracks))
+        song.create_return_track()
+        returns = list(song.return_tracks)
+        new_track = returns[-1]
+        return {"status": "ok", "id": len(returns) - 1, "name": new_track.name, "return_count": len(returns)}
+
+    @server.route("POST", "/live/tracks/{track_id}/color")
+    def set_track_color(track_id, body=None):
+        track = _get_track(track_id)
+        if track is None:
+            return {"error": f"track {track_id} not found"}
+        b = body or {}
+        if "color_index" in b:
+            track.color_index = int(b["color_index"])
+        elif "color" in b:
+            track.color = int(b["color"])
+        else:
+            return {"error": "missing 'color_index' or 'color'"}
+        return {"status": "ok", "color": track.color, "color_index": track.color_index}
+
+    @server.route("POST", "/live/song/capture_and_insert_scene")
+    def capture_and_insert_scene(body=None):
+        song = util.song()
+        before = len(list(song.scenes))
+        song.capture_and_insert_scene()
+        scenes = list(song.scenes)
+        return {"status": "ok", "scene_count": len(scenes), "new_scene_id": before}
+
     # --- Master track ---
 
     @server.route("GET", "/live/master")

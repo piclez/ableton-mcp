@@ -15,6 +15,16 @@ client = AbletonClient(host=HOST, port=PORT)
 
 
 # ============================================================
+# TRACK AND CLIP NUMBERING
+# ============================================================
+# track_id and clip_id (slot index) are 0-based in this API.
+# Ableton Live displays tracks starting from 1 in the UI.
+# IMPORTANT: when the user says "track 3", they mean track_id=2 in API calls.
+#            when the user says "track 1", they mean track_id=0. Always subtract 1.
+# Use list_tracks() or describe_session_structure() to find track_id by name.
+# ============================================================
+
+# ============================================================
 # GENERAL WORKFLOW FOR CONTROLLING DEVICES/INSTRUMENTS
 # ============================================================
 # To change a parameter on an instrument or effect:
@@ -197,6 +207,128 @@ async def redo() -> dict:
     return await client.post("/live/redo")
 
 
+@mcp.tool()
+async def tap_tempo() -> dict:
+    """Tap tempo — each call registers one tap. Returns {"status": "ok", "tempo": float}."""
+    return await client.post("/live/song/tap_tempo")
+
+
+@mcp.tool()
+async def capture_midi() -> dict:
+    """Capture MIDI from the buffer (notes played before recording started).
+
+    Equivalent to Edit → Capture MIDI. Fails if no MIDI in buffer.
+    Returns {"status": "ok"}.
+    """
+    return await client.post("/live/song/capture_midi")
+
+
+@mcp.tool()
+async def re_enable_automation() -> dict:
+    """Re-enable automation for all parameters (clears the yellow 'automation overridden' state).
+    Returns {"status": "ok"}.
+    """
+    return await client.post("/live/song/re_enable_automation")
+
+
+@mcp.tool()
+async def trigger_session_record() -> dict:
+    """Toggle session record (arm all armed tracks to record in session view).
+    Returns {"status": "ok"}.
+    """
+    return await client.post("/live/song/trigger_session_record")
+
+
+@mcp.tool()
+async def jump_by(beats: float) -> dict:
+    """Move playhead forward or backward by a number of beats.
+
+    beats: float — positive = forward, negative = backward.
+    Returns {"status": "ok", "current_song_time": float}.
+    """
+    return await client.post("/live/song/jump_by", {"beats": beats})
+
+
+@mcp.tool()
+async def scrub_by(beats: float) -> dict:
+    """Scrub playhead by beats (plays audio while scrubbing).
+
+    beats: float — positive = forward, negative = backward.
+    Returns {"status": "ok"}.
+    """
+    return await client.post("/live/song/scrub_by", {"beats": beats})
+
+
+@mcp.tool()
+async def jump_to_next_cue() -> dict:
+    """Jump playhead to the next cue point. Returns {"status": "ok", "current_song_time": float}."""
+    return await client.post("/live/song/jump_to_next_cue")
+
+
+@mcp.tool()
+async def jump_to_prev_cue() -> dict:
+    """Jump playhead to the previous cue point. Returns {"status": "ok", "current_song_time": float}."""
+    return await client.post("/live/song/jump_to_prev_cue")
+
+
+@mcp.tool()
+async def get_cue_points() -> dict:
+    """List all cue points in the arrangement.
+    Returns {"cue_points": [{"time": float, "name": str}]}.
+    """
+    return await client.get("/live/song/cue_points")
+
+
+@mcp.tool()
+async def set_or_delete_cue() -> dict:
+    """Add a cue point at the current playhead position, or delete it if one already exists there.
+    Returns {"status": "ok"}.
+    """
+    return await client.post("/live/song/cue_points")
+
+
+@mcp.tool()
+async def get_scale() -> dict:
+    """Get the current scale settings.
+    Returns {"scale_mode": bool, "scale_name": str, "root_note": int, "scale_intervals": list}.
+    root_note: 0=C, 1=C#, 2=D, ... 11=B.
+    """
+    return await client.get("/live/song/scale")
+
+
+@mcp.tool()
+async def set_scale(scale_mode: bool = None, root_note: int = None, scale_name: str = None) -> dict:
+    """Set the project scale.
+
+    scale_mode: bool — enable/disable scale mode.
+    root_note: int — 0=C, 1=C#, 2=D, 3=D#, 4=E, 5=F, 6=F#, 7=G, 8=G#, 9=A, 10=A#, 11=B.
+    scale_name: str — e.g. "Minor", "Major", "Dorian", "Phrygian", "Lydian", "Mixolydian",
+                       "Locrian", "Whole Tone", "Half-whole Dim.", "Whole-half Dim.",
+                       "Minor Blues", "Minor Pentatonic", "Major Pentatonic", "Harmonic Minor",
+                       "Melodic Minor", "Super Locrian", "Bhairav", "Hungarian Minor",
+                       "Minor Gypsy", "Hirojoshi", "In-Sen", "Iwato", "Kumoi",
+                       "Pelog", "Spanish", "Lydian Dominant", "Minor Bebop", "Major Bebop".
+    Returns {"scale_mode": bool, "scale_name": str, "root_note": int}.
+    """
+    body = {}
+    if scale_mode is not None:
+        body["scale_mode"] = scale_mode
+    if root_note is not None:
+        body["root_note"] = root_note
+    if scale_name is not None:
+        body["scale_name"] = scale_name
+    return await client.post("/live/song/scale", body)
+
+
+
+@mcp.tool()
+async def get_version() -> dict:
+    """Get the Ableton Live version.
+    Returns {"major": int, "minor": int, "bugfix": int, "version_string": str, "variant": str}.
+    """
+    return await client.get("/live/song/version")
+
+
 # --- Tracks ---
 
 
@@ -207,7 +339,9 @@ async def list_tracks() -> dict:
     Returns {"tracks": [{"id": int, "name": str, "type": "midi"|"audio",
     "arm": bool, "solo": bool, "mute": bool,
     "volume": {"value": float, "display": str}, "pan": {"value": float, "display": str}}]}.
-    Use the "id" field as track_id in all other track/device/clip tools.
+    Use the "id" field as track_id in all other tools.
+    NOTE: track ids are 0-based. Ableton shows tracks from 1 in the UI.
+    "track 3" in Ableton = track_id=2 here. Always use the "id" from this response.
     """
     return await client.get("/live/tracks")
 
@@ -305,6 +439,42 @@ async def stop_track(track_id: int) -> dict:
 
 
 @mcp.tool()
+async def set_track_color(track_id: int, color_index: int = None, color: int = None) -> dict:
+    """Set the color of a track.
+
+    track_id: int — 0-based (track 1 in Ableton = track_id=0).
+    color_index: int — Ableton color palette index (0-69).
+    color: int — RGB color as integer (alternative to color_index).
+    Returns {"status": "ok", "color": int, "color_index": int}.
+    """
+    body = {}
+    if color_index is not None:
+        body["color_index"] = color_index
+    elif color is not None:
+        body["color"] = color
+    return await client.post(f"/live/tracks/{track_id}/color", body)
+
+
+
+@mcp.tool()
+async def create_return_track() -> dict:
+    """Create a new return track (A, B, C...).
+    Returns {"status": "ok", "id": int, "name": str, "return_count": int}.
+    """
+    return await client.post("/live/returns/create")
+
+
+@mcp.tool()
+async def capture_and_insert_scene() -> dict:
+    """Capture all currently playing clips and insert them as a new scene.
+    Equivalent to the 'Capture and Insert Scene' button in Ableton.
+    Returns {"status": "ok", "scene_count": int, "new_scene_id": int}.
+    """
+    return await client.post("/live/song/capture_and_insert_scene")
+
+
+
+@mcp.tool()
 async def get_playing_clips() -> dict:
     """Get list of currently playing clips.
 
@@ -380,6 +550,46 @@ async def add_drum_pad_sample(track_id: int, device_id: int, pad_note: int, path
         f"/live/tracks/{track_id}/devices/{device_id}/drum_pads/{pad_note}/sample",
         {"path": path},
     )
+
+
+@mcp.tool()
+async def duplicate_device(track_id: int, device_id: int) -> dict:
+    """Duplicate a device on a track (inserts copy right after the original).
+
+    track_id: int — from list_tracks().
+    device_id: int — from list_devices().
+    Returns {"status": "ok", "device_count": int}.
+    """
+    return await client.post(f"/live/tracks/{track_id}/devices/{device_id}/duplicate")
+
+
+@mcp.tool()
+async def delete_device(track_id: int, device_id: int) -> dict:
+    """Delete a device from a track.
+
+    track_id: int — from list_tracks().
+    device_id: int — from list_devices().
+    Returns {"status": "ok", "device_count": int}.
+    """
+    return await client.post(f"/live/tracks/{track_id}/devices/{device_id}/delete")
+
+
+@mcp.tool()
+async def move_device(from_track_id: int, device_id: int, to_track_id: int, to_device_id: int = 0) -> dict:
+    """Move a device from one track to another.
+
+    from_track_id: int — source track.
+    device_id: int — device to move (from list_devices()).
+    to_track_id: int — destination track.
+    to_device_id: int — position in destination track's device list (default 0 = first).
+    Returns {"status": "ok"}.
+    """
+    return await client.post("/live/song/move_device", {
+        "from_track_id": from_track_id,
+        "device_id": device_id,
+        "to_track_id": to_track_id,
+        "to_device_id": to_device_id,
+    })
 
 
 @mcp.tool()
@@ -656,6 +866,81 @@ async def extend_clip_loop(track_id: int, clip_id: int, bars: int = 1) -> dict:
     """
     return await client.post(
         f"/live/tracks/{track_id}/clips/{clip_id}/loop/extend", {"bars": bars}
+    )
+
+
+@mcp.tool()
+async def quantize_clip(track_id: int, clip_id: int, quantization: int = 4, amount: float = 1.0) -> dict:
+    """Quantize notes in a MIDI clip.
+
+    quantization: int — grid: 1=1bar, 2=1/2, 3=1/4, 4=1/8, 5=1/16, 6=1/32 (default 4 = 1/8).
+    amount: float — strength 0.0–1.0 (default 1.0 = full quantize).
+    Returns {"status": "ok"}.
+    """
+    return await client.post(
+        f"/live/tracks/{track_id}/clips/{clip_id}/quantize",
+        {"quantization": quantization, "amount": amount},
+    )
+
+
+@mcp.tool()
+async def crop_clip(track_id: int, clip_id: int) -> dict:
+    """Crop the clip to its loop boundaries (removes content outside loop start/end).
+    Returns {"status": "ok", "length": float, "start_marker": float, "end_marker": float}.
+    """
+    return await client.post(f"/live/tracks/{track_id}/clips/{clip_id}/crop")
+
+
+@mcp.tool()
+async def set_audio_clip_props(
+    track_id: int,
+    clip_id: int,
+    pitch_coarse: int = None,
+    pitch_fine: float = None,
+    gain: float = None,
+    warping: bool = None,
+    warp_mode: int = None,
+) -> dict:
+    """Set audio clip properties (pitch, gain, warp). Only for audio clips.
+
+    pitch_coarse: int — transpose in semitones (-48 to +48).
+    pitch_fine: float — detune in cents (-50.0 to +50.0).
+    gain: float — clip gain (0.0 = -inf dB, 1.0 = 0 dB, >1.0 = boost).
+    warping: bool — enable/disable warping.
+    warp_mode: int — 0=Beats, 1=Tones, 2=Texture, 3=Re-Pitch, 4=Complex, 5=Complex Pro, 6=Hybrid.
+    Returns {"status": "ok", "pitch_coarse", "pitch_fine", "gain", "gain_display", "warping", "warp_mode"}.
+    """
+    body = {}
+    if pitch_coarse is not None:
+        body["pitch_coarse"] = pitch_coarse
+    if pitch_fine is not None:
+        body["pitch_fine"] = pitch_fine
+    if gain is not None:
+        body["gain"] = gain
+    if warping is not None:
+        body["warping"] = warping
+    if warp_mode is not None:
+        body["warp_mode"] = warp_mode
+    return await client.post(f"/live/tracks/{track_id}/clips/{clip_id}/audio", body)
+
+
+@mcp.tool()
+async def set_clip_mute(track_id: int, clip_id: int, muted: bool) -> dict:
+    """Mute or unmute a clip. Returns {"status": "ok", "muted": bool}."""
+    return await client.post(
+        f"/live/tracks/{track_id}/clips/{clip_id}/mute", {"muted": muted}
+    )
+
+
+@mcp.tool()
+async def set_clip_velocity_amount(track_id: int, clip_id: int, value: float) -> dict:
+    """Set velocity randomization amount for a clip.
+
+    value: float — 0.0 (no randomization) to 1.0 (full randomization).
+    Returns {"status": "ok", "velocity_amount": float}.
+    """
+    return await client.post(
+        f"/live/tracks/{track_id}/clips/{clip_id}/velocity_amount", {"value": value}
     )
 
 
@@ -966,6 +1251,268 @@ async def delete_track(track_id: int) -> dict:
     Returns {"status": "ok", "track_count": int}.
     """
     return await client.delete(f"/live/tracks/{track_id}")
+
+
+# --- Arrangement View ---
+
+
+@mcp.tool()
+async def list_arrangement_clips(track_id: int) -> dict:
+    """List all clips on a track in Arrangement View (timeline).
+
+    track_id: int — from list_tracks().
+    Returns {"clips": [{"start_time": float, "end_time": float, "length": float,
+      "position": float, "name": str, "color": int, "color_index": int,
+      "is_midi_clip": bool, "is_audio_clip": bool,
+      "looping": bool, "loop_start": float, "loop_end": float,
+      "muted": bool, "is_playing": bool}]}.
+
+    Key fields:
+      start_time / end_time — position on the Arrangement timeline in beats.
+      length — content length in beats (loop_end - loop_start).
+      looping — if True, the clip content repeats to fill start_time→end_time.
+      end_time - start_time gives the total duration in Arrangement.
+
+    Use start_time as the clip identifier in all arrangement clip operations.
+    """
+    return await client.get(f"/live/tracks/{track_id}/arrangement_clips")
+
+
+@mcp.tool()
+async def create_arrangement_clip(
+    track_id: int, start_time: float, length: float = 4.0, name: str = ""
+) -> dict:
+    """Create a new empty MIDI clip in Arrangement View.
+
+    track_id: int — must be a MIDI track.
+    start_time: float — position on the timeline in beats (0 = song start).
+    length: float — clip content length in beats (default 4.0 = 1 bar in 4/4).
+    name: str — optional name.
+    Returns clip info with "start_time" field — use it as clip identifier.
+    """
+    return await client.post(
+        f"/live/tracks/{track_id}/arrangement_clips/create",
+        {"start_time": start_time, "length": length, "name": name},
+    )
+
+
+@mcp.tool()
+async def delete_arrangement_clip(track_id: int, start_time: float) -> dict:
+    """Delete a clip from Arrangement View.
+
+    track_id: int — from list_tracks().
+    start_time: float — clip's start position in beats (from list_arrangement_clips()).
+    Returns {"status": "ok"}.
+    """
+    return await client.delete(f"/live/tracks/{track_id}/arrangement_clips/{start_time}")
+
+
+@mcp.tool()
+async def move_arrangement_clip(track_id: int, start_time: float, position: float) -> dict:
+    """Move a clip to a new position on the Arrangement timeline.
+
+    track_id: int — from list_tracks().
+    start_time: float — current clip start position (identifies the clip).
+    position: float — new start position in beats.
+    Returns updated clip info.
+    """
+    return await client.post(
+        f"/live/tracks/{track_id}/arrangement_clips/{start_time}/move",
+        {"position": position},
+    )
+
+
+@mcp.tool()
+async def resize_arrangement_clip(
+    track_id: int,
+    start_time: float,
+    end_time: float | None = None,
+    new_start_time: float | None = None,
+) -> dict:
+    """Resize an arrangement clip by changing its start or end time.
+
+    For a looping clip, changing end_time extends/shrinks how many loop repeats play.
+    For a non-looping clip, it trims the content.
+
+    track_id: int — from list_tracks().
+    start_time: float — current clip start (identifies the clip).
+    end_time: float — new end position in beats.
+    new_start_time: float — new start position in beats (trims from the front).
+    Returns updated clip info.
+    """
+    body = {}
+    if end_time is not None:
+        body["end_time"] = end_time
+    if new_start_time is not None:
+        body["start_time"] = new_start_time
+    return await client.post(
+        f"/live/tracks/{track_id}/arrangement_clips/{start_time}/resize", body
+    )
+
+
+@mcp.tool()
+async def set_arrangement_clip_loop(
+    track_id: int,
+    start_time: float,
+    looping: bool | None = None,
+    loop_start: float | None = None,
+    loop_end: float | None = None,
+) -> dict:
+    """Set loop settings on an arrangement clip.
+
+    looping: bool — enable/disable looping.
+    loop_start / loop_end: float — loop region within the clip content (in beats, relative to clip).
+    When looping=True and end_time > start_time + (loop_end - loop_start),
+    the content repeats to fill the arrangement region.
+    Returns updated clip info.
+    """
+    body = {}
+    if looping is not None:
+        body["looping"] = looping
+    if loop_start is not None:
+        body["loop_start"] = loop_start
+    if loop_end is not None:
+        body["loop_end"] = loop_end
+    return await client.post(
+        f"/live/tracks/{track_id}/arrangement_clips/{start_time}/loop", body
+    )
+
+
+@mcp.tool()
+async def duplicate_clip_to_arrangement(
+    track_id: int, clip_id: int, start_time: float
+) -> dict:
+    """Copy a Session View clip to a position in Arrangement View.
+
+    track_id: int — from list_tracks().
+    clip_id: int — Session clip slot index (from list_clips()).
+    start_time: float — where to place it on the Arrangement timeline (in beats).
+    Returns {"status": "ok", "start_time": float}.
+    """
+    return await client.post(
+        f"/live/tracks/{track_id}/clips/{clip_id}/duplicate_to_arrangement",
+        {"start_time": start_time},
+    )
+
+
+@mcp.tool()
+async def rename_arrangement_clip(track_id: int, start_time: float, name: str) -> dict:
+    """Rename a clip in Arrangement View.
+
+    track_id: int — from list_tracks().
+    start_time: float — clip's start position in beats (from list_arrangement_clips()).
+    name: str — new clip name.
+    Returns {"status": "ok"}.
+    """
+    return await client.post(
+        f"/live/tracks/{track_id}/arrangement_clips/{start_time}/name", {"name": name}
+    )
+
+
+@mcp.tool()
+async def set_arrangement_clip_mute(
+    track_id: int, start_time: float, muted: bool
+) -> dict:
+    """Mute or unmute a clip in Arrangement View.
+
+    track_id: int — from list_tracks().
+    start_time: float — clip's start position in beats (from list_arrangement_clips()).
+    muted: bool — True to mute, False to unmute.
+    Returns {"status": "ok", "muted": bool}.
+    """
+    return await client.post(
+        f"/live/tracks/{track_id}/arrangement_clips/{start_time}/mute", {"muted": muted}
+    )
+
+
+@mcp.tool()
+async def set_arrangement_overdub(enabled: bool | None = None) -> dict:
+    """Enable/disable arrangement overdub (records automation while playing Arrangement).
+
+    enabled: bool — set explicitly, or omit to toggle.
+    Returns {"status": "ok", "arrangement_overdub": bool}.
+    """
+    body = {"enabled": enabled} if enabled is not None else {}
+    return await client.post("/live/song/arrangement_overdub", body)
+
+
+@mcp.tool()
+async def back_to_arranger() -> dict:
+    """Return playback control to Arrangement View (cancels Session View override).
+
+    Call this after Session View clips have taken over playback and you want Arrangement
+    to resume from where it was.
+    Returns {"status": "ok"}.
+    """
+    return await client.post("/live/song/back_to_arranger")
+
+
+# --- Clip envelopes (automation) ---
+
+
+@mcp.tool()
+async def list_clip_envelopes(track_id: int, clip_id: int) -> dict:
+    """List automation envelopes present in a Session View clip.
+
+    Returns {"envelopes": [{"param_name": str, "device_name": str, "device_id": int}]}.
+    Use device_id + param_name to read or write envelope data with get/insert/delete_clip_envelope_*.
+    """
+    return await client.get(f"/live/tracks/{track_id}/clips/{clip_id}/envelopes")
+
+
+@mcp.tool()
+async def get_clip_envelope_events(
+    track_id: int, clip_id: int, device_id: int, param_name: str,
+) -> dict:
+    """Get all automation events from a Session View clip envelope.
+
+    device_id: int — from list_devices() or list_clip_envelopes().
+    param_name: str — exact parameter name from list_parameters().
+    Returns {"has_envelope": bool, "events": [{"time": float, "value": float}]}.
+    """
+    return await client.get(
+        f"/live/tracks/{track_id}/clips/{clip_id}/envelopes/{device_id}/{param_name}"
+    )
+
+
+@mcp.tool()
+async def insert_clip_envelope_step(
+    track_id: int, clip_id: int, device_id: int, param_name: str,
+    time: float, value: float, duration: float = 0.0,
+) -> dict:
+    """Insert an automation point into a Session View clip envelope.
+
+    Creates the envelope if it doesn't exist yet.
+    time: float — beat position in the clip.
+    value: float — parameter value (in the parameter's [min, max] range from list_parameters()).
+    duration: float — step width (0.0 = instant step, default).
+    Returns {"status": "ok"}.
+    """
+    return await client.post(
+        f"/live/tracks/{track_id}/clips/{clip_id}/envelopes/{device_id}/{param_name}/insert",
+        {"time": time, "value": value, "duration": duration},
+    )
+
+
+@mcp.tool()
+async def delete_clip_envelope_range(
+    track_id: int, clip_id: int, device_id: int, param_name: str,
+    from_time: float | None = None, to_time: float | None = None,
+) -> dict:
+    """Delete automation events in a time range from a Session View clip envelope.
+
+    from_time / to_time: float — beat range (defaults to full clip length).
+    Returns {"status": "ok"}.
+    """
+    body = {}
+    if from_time is not None:
+        body["from_time"] = from_time
+    if to_time is not None:
+        body["to_time"] = to_time
+    return await client.delete(
+        f"/live/tracks/{track_id}/clips/{clip_id}/envelopes/{device_id}/{param_name}/range",
+        body,
+    )
 
 
 # --- Clip color ---

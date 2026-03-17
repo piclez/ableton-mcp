@@ -27,7 +27,7 @@ def _clip_info(clip_id, clip_slot):
     if not clip_slot.has_clip:
         return {"id": clip_id, "has_clip": False}
     clip = clip_slot.clip
-    return {
+    info = {
         "id": clip_id,
         "has_clip": True,
         "name": clip.name,
@@ -36,10 +36,28 @@ def _clip_info(clip_id, clip_slot):
         "length": clip.length,
         "is_playing": clip.is_playing,
         "is_recording": clip.is_recording,
+        "is_audio_clip": clip.is_audio_clip,
+        "is_midi_clip": clip.is_midi_clip,
         "looping": clip.looping,
         "loop_start": clip.loop_start,
         "loop_end": clip.loop_end,
+        "start_marker": clip.start_marker,
+        "end_marker": clip.end_marker,
+        "velocity_amount": clip.velocity_amount,
+        "muted": clip.muted,
+        "position": clip.position,
     }
+    if clip.is_audio_clip:
+        try:
+            info["gain"] = clip.gain
+            info["gain_display"] = clip.gain_display_string
+            info["pitch_coarse"] = clip.pitch_coarse
+            info["pitch_fine"] = clip.pitch_fine
+            info["warping"] = clip.warping
+            info["warp_mode"] = clip.warp_mode
+        except Exception:
+            pass
+    return info
 
 
 def register(server):
@@ -244,3 +262,70 @@ def register(server):
             "loop_end": clip.loop_end,
             "length": clip.length,
         }
+
+    @server.route("POST", "/live/tracks/{track_id}/clips/{clip_id}/quantize")
+    def quantize_clip(track_id, clip_id, body=None):
+        _, _, clip = _get_clip(track_id, clip_id)
+        if clip is None:
+            return {"error": f"clip {clip_id} not found on track {track_id}"}
+        # quantization: 1=1bar, 2=1/2, 3=1/4, 4=1/8, 5=1/16, 6=1/32
+        quantization = int((body or {}).get("quantization", 4))
+        amount = float((body or {}).get("amount", 1.0))
+        clip.quantize(quantization, amount)
+        return {"status": "ok"}
+
+    @server.route("POST", "/live/tracks/{track_id}/clips/{clip_id}/crop")
+    def crop_clip(track_id, clip_id, body=None):
+        _, _, clip = _get_clip(track_id, clip_id)
+        if clip is None:
+            return {"error": f"clip {clip_id} not found on track {track_id}"}
+        clip.crop()
+        return {"status": "ok", "length": clip.length, "start_marker": clip.start_marker, "end_marker": clip.end_marker}
+
+    @server.route("POST", "/live/tracks/{track_id}/clips/{clip_id}/audio")
+    def set_audio_clip_props(track_id, clip_id, body=None):
+        _, _, clip = _get_clip(track_id, clip_id)
+        if clip is None:
+            return {"error": f"clip {clip_id} not found on track {track_id}"}
+        if not clip.is_audio_clip:
+            return {"error": "clip is not an audio clip"}
+        b = body or {}
+        if "pitch_coarse" in b:
+            clip.pitch_coarse = int(b["pitch_coarse"])
+        if "pitch_fine" in b:
+            clip.pitch_fine = float(b["pitch_fine"])
+        if "gain" in b:
+            clip.gain = float(b["gain"])
+        if "warping" in b:
+            clip.warping = bool(b["warping"])
+        if "warp_mode" in b:
+            clip.warp_mode = int(b["warp_mode"])
+        return {
+            "status": "ok",
+            "pitch_coarse": clip.pitch_coarse,
+            "pitch_fine": clip.pitch_fine,
+            "gain": clip.gain,
+            "gain_display": clip.gain_display_string,
+            "warping": clip.warping,
+            "warp_mode": clip.warp_mode,
+        }
+
+    @server.route("POST", "/live/tracks/{track_id}/clips/{clip_id}/mute")
+    def set_clip_mute(track_id, clip_id, body=None):
+        _, _, clip = _get_clip(track_id, clip_id)
+        if clip is None:
+            return {"error": f"clip {clip_id} not found on track {track_id}"}
+        muted = bool((body or {}).get("muted", not clip.muted))
+        clip.muted = muted
+        return {"status": "ok", "muted": clip.muted}
+
+    @server.route("POST", "/live/tracks/{track_id}/clips/{clip_id}/velocity_amount")
+    def set_clip_velocity_amount(track_id, clip_id, body=None):
+        _, _, clip = _get_clip(track_id, clip_id)
+        if clip is None:
+            return {"error": f"clip {clip_id} not found on track {track_id}"}
+        value = (body or {}).get("value")
+        if value is None:
+            return {"error": "missing 'value'"}
+        clip.velocity_amount = float(value)
+        return {"status": "ok", "velocity_amount": clip.velocity_amount}

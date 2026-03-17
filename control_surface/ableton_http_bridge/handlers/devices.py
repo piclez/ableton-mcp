@@ -504,6 +504,51 @@ def register(server):
             "sample": path,
         }
 
+    # --- Device management ---
+
+    @server.route("POST", "/live/tracks/{track_id}/devices/{device_id}/duplicate")
+    def duplicate_device(track_id, device_id, body=None):
+        track = _get_track(track_id)
+        if track is None:
+            return {"error": f"track {track_id} not found"}
+        devices = list(track.devices)
+        if device_id < 0 or device_id >= len(devices):
+            return {"error": f"device {device_id} not found on track {track_id}"}
+        track.duplicate_device(device_id)
+        new_devices = list(track.devices)
+        return {"status": "ok", "device_count": len(new_devices)}
+
+    @server.route("POST", "/live/tracks/{track_id}/devices/{device_id}/delete")
+    def delete_device(track_id, device_id, body=None):
+        track = _get_track(track_id)
+        if track is None:
+            return {"error": f"track {track_id} not found"}
+        devices = list(track.devices)
+        if device_id < 0 or device_id >= len(devices):
+            return {"error": f"device {device_id} not found on track {track_id}"}
+        track.delete_device(device_id)
+        return {"status": "ok", "device_count": len(list(track.devices))}
+
+    @server.route("POST", "/live/song/move_device")
+    def move_device(body=None):
+        from_track_id = (body or {}).get("from_track_id")
+        device_id = (body or {}).get("device_id")
+        to_track_id = (body or {}).get("to_track_id")
+        to_device_id = (body or {}).get("to_device_id", 0)
+        if from_track_id is None or device_id is None or to_track_id is None:
+            return {"error": "missing 'from_track_id', 'device_id', or 'to_track_id'"}
+        song = util.song()
+        tracks = list(song.tracks)
+        if from_track_id < 0 or from_track_id >= len(tracks):
+            return {"error": f"source track {from_track_id} not found"}
+        if to_track_id < 0 or to_track_id >= len(tracks):
+            return {"error": f"destination track {to_track_id} not found"}
+        from_devices = list(tracks[from_track_id].devices)
+        if device_id < 0 or device_id >= len(from_devices):
+            return {"error": f"device {device_id} not found on track {from_track_id}"}
+        song.move_device(from_devices[device_id], tracks[to_track_id], to_device_id)
+        return {"status": "ok"}
+
     # --- Master track devices ---
 
     @server.route("GET", "/live/master/devices")

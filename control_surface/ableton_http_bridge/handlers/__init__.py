@@ -1,5 +1,6 @@
 """Route handlers for the HTTP bridge."""
 
+from .arrangement import register as register_arrangement
 from .clips import register as register_clips
 from .devices import register as register_devices
 from .scenes import register as register_scenes
@@ -15,3 +16,4 @@ def register_all(server):
     register_devices(server)
     register_clips(server)
     register_scenes(server)
+    register_arrangement(server)

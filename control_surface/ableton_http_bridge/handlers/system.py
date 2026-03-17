@@ -370,3 +370,128 @@ def register(server):
             return {"category": category, "name": root.name, "children": children}
         except Exception as e:
             return {"error": str(e)}
+
+    # --- Song actions ---
+
+    @server.route("GET", "/live/song/arrangement_overdub")
+    def get_arrangement_overdub(body=None):
+        song = util.song()
+        return {"arrangement_overdub": song.arrangement_overdub}
+
+    @server.route("POST", "/live/song/arrangement_overdub")
+    def set_arrangement_overdub(body=None):
+        song = util.song()
+        enabled = (body or {}).get("enabled")
+        if enabled is None:
+            song.arrangement_overdub = not song.arrangement_overdub
+        else:
+            song.arrangement_overdub = bool(enabled)
+        return {"status": "ok", "arrangement_overdub": song.arrangement_overdub}
+
+    @server.route("POST", "/live/song/back_to_arranger")
+    def back_to_arranger(body=None):
+        util.song().back_to_arranger = True
+        return {"status": "ok"}
+
+    @server.route("POST", "/live/song/tap_tempo")
+    def tap_tempo(body=None):
+        util.song().tap_tempo()
+        return {"status": "ok", "tempo": util.song().tempo}
+
+    @server.route("POST", "/live/song/capture_midi")
+    def capture_midi(body=None):
+        song = util.song()
+        if not song.can_capture_midi:
+            return {"error": "no MIDI to capture"}
+        song.capture_midi()
+        return {"status": "ok"}
+
+    @server.route("POST", "/live/song/re_enable_automation")
+    def re_enable_automation(body=None):
+        util.song().re_enable_automation()
+        return {"status": "ok"}
+
+    @server.route("POST", "/live/song/trigger_session_record")
+    def trigger_session_record(body=None):
+        util.song().trigger_session_record()
+        return {"status": "ok"}
+
+    @server.route("POST", "/live/song/jump_by")
+    def jump_by(body=None):
+        beats = (body or {}).get("beats")
+        if beats is None:
+            return {"error": "missing 'beats'"}
+        util.song().jump_by(float(beats))
+        return {"status": "ok", "current_song_time": util.song().current_song_time}
+
+    @server.route("POST", "/live/song/scrub_by")
+    def scrub_by(body=None):
+        beats = (body or {}).get("beats")
+        if beats is None:
+            return {"error": "missing 'beats'"}
+        util.song().scrub_by(float(beats))
+        return {"status": "ok"}
+
+    @server.route("POST", "/live/song/jump_to_next_cue")
+    def jump_to_next_cue(body=None):
+        song = util.song()
+        if not song.can_jump_to_next_cue:
+            return {"error": "no next cue point"}
+        song.jump_to_next_cue()
+        return {"status": "ok", "current_song_time": song.current_song_time}
+
+    @server.route("POST", "/live/song/jump_to_prev_cue")
+    def jump_to_prev_cue(body=None):
+        song = util.song()
+        if not song.can_jump_to_prev_cue:
+            return {"error": "no previous cue point"}
+        song.jump_to_prev_cue()
+        return {"status": "ok", "current_song_time": song.current_song_time}
+
+    @server.route("GET", "/live/song/cue_points")
+    def get_cue_points(body=None):
+        cue_points = list(util.song().cue_points)
+        return {"cue_points": [{"time": cp.time, "name": cp.name} for cp in cue_points]}
+
+    @server.route("POST", "/live/song/cue_points")
+    def set_or_delete_cue(body=None):
+        util.song().set_or_delete_cue()
+        return {"status": "ok"}
+
+    @server.route("GET", "/live/song/scale")
+    def get_scale(body=None):
+        song = util.song()
+        return {
+            "scale_mode": song.scale_mode,
+            "scale_name": song.scale_name,
+            "root_note": song.root_note,
+            "scale_intervals": list(song.scale_intervals),
+        }
+
+    @server.route("POST", "/live/song/scale")
+    def set_scale(body=None):
+        song = util.song()
+        b = body or {}
+        if "scale_mode" in b:
+            song.scale_mode = bool(b["scale_mode"])
+        if "root_note" in b:
+            song.root_note = int(b["root_note"])
+        if "scale_name" in b:
+            song.scale_name = str(b["scale_name"])
+        return {
+            "scale_mode": song.scale_mode,
+            "scale_name": song.scale_name,
+            "root_note": song.root_note,
+        }
+
+    @server.route("GET", "/live/song/version")
+    def get_version(body=None):
+        import Live
+        app = Live.Application.get_application()
+        return {
+            "major": app.get_major_version(),
+            "minor": app.get_minor_version(),
+            "bugfix": app.get_bugfix_version(),
+            "version_string": app.get_version_string(),
+            "variant": app.get_variant(),
+        }

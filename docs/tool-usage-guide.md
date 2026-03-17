@@ -274,3 +274,73 @@ All tools return `{"error": "..."}` on failure. Common causes:
 | `rename_scene` | `scene_id`, `name` | Rename a scene |
 | `fire_scene` | `scene_id` | Launch all clips in a scene |
 | `select_scene` | `scene_id` | Select/highlight a scene in the GUI |
+
+### Arrangement View
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `list_arrangement_clips` | `track_id` | List all clips on a track in Arrangement View |
+| `create_arrangement_clip` | `track_id`, `start_time`, `length=4.0`, `name=""` | Create a MIDI clip at a position (beats) |
+| `delete_arrangement_clip` | `track_id`, `start_time` | Delete an arrangement clip |
+| `move_arrangement_clip` | `track_id`, `start_time`, `position` | Move clip to a new timeline position |
+| `resize_arrangement_clip` | `track_id`, `start_time`, `end_time`, `new_start_time` | Resize clip by adjusting start/end |
+| `set_arrangement_clip_loop` | `track_id`, `start_time`, `looping`, `loop_start`, `loop_end` | Set loop region on an arrangement clip |
+| `rename_arrangement_clip` | `track_id`, `start_time`, `name` | Rename an arrangement clip |
+| `set_arrangement_clip_mute` | `track_id`, `start_time`, `muted` | Mute/unmute an arrangement clip |
+| `duplicate_clip_to_arrangement` | `track_id`, `clip_id`, `start_time` | Copy a Session View clip to Arrangement |
+| `set_arrangement_overdub` | `enabled` | Enable/disable arrangement overdub (omit to toggle) |
+| `back_to_arranger` | — | Return playback control to Arrangement View |
+
+### Clip envelopes (automation)
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `list_clip_envelopes` | `track_id`, `clip_id` | List automation envelopes in a Session clip |
+| `get_clip_envelope_events` | `track_id`, `clip_id`, `device_id`, `param_name` | Get all automation points from an envelope |
+| `insert_clip_envelope_step` | `track_id`, `clip_id`, `device_id`, `param_name`, `time`, `value`, `duration=0.0` | Insert an automation point |
+| `delete_clip_envelope_range` | `track_id`, `clip_id`, `device_id`, `param_name`, `from_time`, `to_time` | Delete automation points in a range |
+
+### Song & transport extras
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `tap_tempo` | — | Tap to set BPM |
+| `jump_by` | `beats` | Jump playhead forward/backward by N beats |
+| `scrub_by` | `beats` | Scrub playhead by N beats |
+| `jump_to_next_cue` | — | Jump to next cue point |
+| `jump_to_prev_cue` | — | Jump to previous cue point |
+| `get_cue_points` | — | List all cue points |
+| `set_or_delete_cue` | `name`, `delete=false` | Set or delete a cue at the current position |
+| `get_scale` | — | Get current scale settings |
+| `set_scale` | `root_note`, `name`, `enabled` | Set scale (root 0–11, name e.g. "Minor") |
+| `capture_midi` | — | Capture MIDI from the buffer into a clip |
+| `capture_and_insert_scene` | — | Capture playing clips as a new scene |
+| `trigger_session_record` | — | Trigger session recording |
+| `re_enable_automation` | — | Re-enable automation after manual override |
+| `get_version` | — | Get Ableton Live version info |
+| `describe_session_structure` | — | AI-friendly session analysis (track roles, genre guess, energy) |
+
+### Browser & loading devices
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `get_browser_info` | — | Browser categories and metadata |
+| `browse_devices` | `category` | Browse device tree (instruments, effects, samples, etc.) |
+| `load_device` | `track_id`, `device_name` | Load a device onto a track by name |
+| `load_preset` | `track_id`, `preset_uri` | Load a preset from browser URI |
+| `create_drum_rack` | `track_id` | Create a Drum Rack on a track |
+| `add_drum_pad_sample` | `track_id`, `device_id`, `pad_note`, `sample_path` | Add a sample to a drum pad |
+| `duplicate_device` | `track_id`, `device_id` | Duplicate a device |
+| `delete_device` | `track_id`, `device_id` | Delete a device |
+| `move_device` | `track_id`, `device_id`, `target_track_id`, `target_index` | Move device to another track |
+
+### Extra clip operations
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `quantize_clip` | `track_id`, `clip_id`, `quantize_to=1.0`, `amount=1.0` | Quantize clip notes |
+| `crop_clip` | `track_id`, `clip_id` | Crop clip to loop boundaries |
+| `set_audio_clip_props` | `track_id`, `clip_id`, `pitch_coarse`, `pitch_fine`, `gain`, `warp_mode`, `warping` | Set audio clip properties |
+| `set_clip_mute` | `track_id`, `clip_id`, `muted` | Mute/unmute a Session View clip |
+| `set_clip_velocity_amount` | `track_id`, `clip_id`, `amount` | Set velocity randomization amount |
+| `create_return_track` | — | Create a new return track |
