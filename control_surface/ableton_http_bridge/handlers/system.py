@@ -390,7 +390,7 @@ def register(server):
 
     @server.route("POST", "/live/song/back_to_arranger")
     def back_to_arranger(body=None):
-        util.song().back_to_arranger = True
+        util.song().back_to_arranger = False
         return {"status": "ok"}
 
     @server.route("POST", "/live/song/tap_tempo")
