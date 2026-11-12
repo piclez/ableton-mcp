@@ -167,3 +167,29 @@ async def test_fire_scene(mock_client):
 async def test_delete_scene(mock_client):
     await srv.delete_scene(1)
     mock_client.delete.assert_called_once_with("/live/scenes/1")
+
+
+@pytest.mark.anyio
+async def test_load_sample_to_slot(mock_client):
+    await srv.load_sample_to_slot(2, 0, "Frequency_C3_ref.wav")
+    mock_client.post.assert_called_once_with(
+        "/live/tracks/2/clips/0/load_sample",
+        {"path": "Frequency_C3_ref.wav"},
+    )
+
+
+@pytest.mark.anyio
+async def test_insert_arrangement_clip_envelope_step(mock_client):
+    await srv.insert_arrangement_clip_envelope_step(2, 168.0, 2, "Frequency", 0.0, 0.53, 1.5)
+    mock_client.post.assert_called_once_with(
+        "/live/tracks/2/arrangement_clips/168.0/envelopes/2/Frequency/insert",
+        {"time": 0.0, "value": 0.53, "duration": 1.5},
+    )
+
+
+@pytest.mark.anyio
+async def test_list_arrangement_clip_envelopes(mock_client):
+    await srv.list_arrangement_clip_envelopes(2, 168.0)
+    mock_client.get.assert_called_once_with(
+        "/live/tracks/2/arrangement_clips/168.0/envelopes"
+    )

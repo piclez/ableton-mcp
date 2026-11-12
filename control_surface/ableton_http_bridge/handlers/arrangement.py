@@ -190,13 +190,14 @@ def register(server):
             return {"error": f"no clip in slot {clip_id} on track {track_id}"}
         start_time = float((body or {}).get("start_time", 0))
         try:
-            track.duplicate_clip_to_arrangement(clip_id, start_time)
+            # Live wants the Clip object here, not the slot index.
+            track.duplicate_clip_to_arrangement(slots[clip_id].clip, start_time)
         except Exception as e:
             return {"error": f"duplicate_clip_to_arrangement failed: {e}"}
         return {"status": "ok", "start_time": start_time}
 
     # ------------------------------------------------------------------ #
-    # Clip envelopes (automation) — works for both Session + Arrangement   #
+    # Clip envelopes (automation) — Session and Arrangement share one impl #
     # ------------------------------------------------------------------ #
 
     def _resolve_clip(track_id, clip_ref, is_arrangement):
@@ -223,23 +224,26 @@ def register(server):
             env = clip.create_automation_envelope(param)
         return env
 
-    # --- Session clip envelopes ---
-
-    @server.route("GET", "/live/tracks/{track_id}/clips/{clip_id}/envelopes")
-    def list_session_envelopes(track_id, clip_id, body=None):
-        track = _get_track(track_id)
+    def _clip_or_error(track_id, clip_ref, is_arrangement):
+        track, clip = _resolve_clip(track_id, clip_ref, is_arrangement)
         if track is None:
-            return {"error": f"track {track_id} not found"}
-        slots = list(track.clip_slots)
-        if clip_id < 0 or clip_id >= len(slots) or not slots[clip_id].has_clip:
-            return {"error": f"no clip in slot {clip_id} on track {track_id}"}
-        clip = slots[clip_id].clip
+            return None, None, {"error": f"track {track_id} not found"}
+        if clip is None:
+            where = "arrangement at start_time" if is_arrangement else "slot"
+            return track, None, {"error": f"no clip in {where} {clip_ref} on track {track_id}"}
+        return track, clip, None
+
+    # --- shared implementations, addressed by either clip kind ---
+
+    def _env_list(track_id, clip_ref, is_arrangement):
+        track, clip, err = _clip_or_error(track_id, clip_ref, is_arrangement)
+        if err:
+            return err
         envelopes = []
         if clip.has_envelopes:
             for device_id, device in enumerate(track.devices):
                 for param in device.parameters:
-                    env = clip.automation_envelope(param)
-                    if env is not None:
+                    if clip.automation_envelope(param) is not None:
                         envelopes.append({
                             "param_name": param.name,
                             "device_name": device.name,
@@ -247,23 +251,19 @@ def register(server):
                         })
         return {"envelopes": envelopes}
 
-    @server.route("GET", "/live/tracks/{track_id}/clips/{clip_id}/envelopes/{device_id}/{param_name}")
-    def get_session_envelope_events(track_id, clip_id, device_id, param_name, body=None):
-        track = _get_track(track_id)
-        if track is None:
-            return {"error": f"track {track_id} not found"}
-        slots = list(track.clip_slots)
-        if clip_id < 0 or clip_id >= len(slots) or not slots[clip_id].has_clip:
-            return {"error": f"no clip in slot {clip_id} on track {track_id}"}
-        clip = slots[clip_id].clip
+    def _env_events(track_id, clip_ref, device_id, param_name, body, is_arrangement):
+        track, clip, err = _clip_or_error(track_id, clip_ref, is_arrangement)
+        if err:
+            return err
         param = _get_param(track, device_id, param_name)
         if param is None:
             return {"error": f"parameter '{param_name}' not found on device {device_id}"}
         env = clip.automation_envelope(param)
         if env is None:
             return {"events": [], "has_envelope": False}
-        from_time = float((body or {}).get("from_time", 0))
-        to_time = float((body or {}).get("to_time", clip.length))
+        b = body or {}
+        from_time = float(b.get("from_time", 0))
+        to_time = float(b.get("to_time", clip.length))
         try:
             events = [
                 {"time": e.time, "value": e.value}
@@ -273,15 +273,10 @@ def register(server):
             return {"error": f"events_in_range failed: {e}"}
         return {"has_envelope": True, "events": events}
 
-    @server.route("POST", "/live/tracks/{track_id}/clips/{clip_id}/envelopes/{device_id}/{param_name}/insert")
-    def insert_session_envelope_step(track_id, clip_id, device_id, param_name, body=None):
-        track = _get_track(track_id)
-        if track is None:
-            return {"error": f"track {track_id} not found"}
-        slots = list(track.clip_slots)
-        if clip_id < 0 or clip_id >= len(slots) or not slots[clip_id].has_clip:
-            return {"error": f"no clip in slot {clip_id} on track {track_id}"}
-        clip = slots[clip_id].clip
+    def _env_insert(track_id, clip_ref, device_id, param_name, body, is_arrangement):
+        track, clip, err = _clip_or_error(track_id, clip_ref, is_arrangement)
+        if err:
+            return err
         param = _get_param(track, device_id, param_name)
         if param is None:
             return {"error": f"parameter '{param_name}' not found on device {device_id}"}
@@ -290,6 +285,8 @@ def register(server):
         value = b.get("value")
         if time is None or value is None:
             return {"error": "missing 'time' or 'value'"}
+        # NOTE: duration 0 inserts a zero-width step, which is inaudible. To build a
+        # continuous curve each step must reach the next breakpoint.
         duration = float(b.get("duration", 0.0))
         env = _envelope_for_param(clip, param, create=True)
         if env is None:
@@ -300,15 +297,10 @@ def register(server):
             return {"error": f"insert_step failed: {e}"}
         return {"status": "ok"}
 
-    @server.route("DELETE", "/live/tracks/{track_id}/clips/{clip_id}/envelopes/{device_id}/{param_name}/range")
-    def delete_session_envelope_range(track_id, clip_id, device_id, param_name, body=None):
-        track = _get_track(track_id)
-        if track is None:
-            return {"error": f"track {track_id} not found"}
-        slots = list(track.clip_slots)
-        if clip_id < 0 or clip_id >= len(slots) or not slots[clip_id].has_clip:
-            return {"error": f"no clip in slot {clip_id} on track {track_id}"}
-        clip = slots[clip_id].clip
+    def _env_delete_range(track_id, clip_ref, device_id, param_name, body, is_arrangement):
+        track, clip, err = _clip_or_error(track_id, clip_ref, is_arrangement)
+        if err:
+            return err
         param = _get_param(track, device_id, param_name)
         if param is None:
             return {"error": f"parameter '{param_name}' not found on device {device_id}"}
@@ -324,15 +316,10 @@ def register(server):
             return {"error": f"delete_events_in_range failed: {e}"}
         return {"status": "ok"}
 
-    @server.route("DELETE", "/live/tracks/{track_id}/clips/{clip_id}/envelopes/{device_id}/{param_name}")
-    def clear_session_envelope(track_id, clip_id, device_id, param_name, body=None):
-        track = _get_track(track_id)
-        if track is None:
-            return {"error": f"track {track_id} not found"}
-        slots = list(track.clip_slots)
-        if clip_id < 0 or clip_id >= len(slots) or not slots[clip_id].has_clip:
-            return {"error": f"no clip in slot {clip_id} on track {track_id}"}
-        clip = slots[clip_id].clip
+    def _env_clear(track_id, clip_ref, device_id, param_name, is_arrangement):
+        track, clip, err = _clip_or_error(track_id, clip_ref, is_arrangement)
+        if err:
+            return err
         param = _get_param(track, device_id, param_name)
         if param is None:
             return {"error": f"parameter '{param_name}' not found on device {device_id}"}
@@ -341,3 +328,49 @@ def register(server):
         except Exception as e:
             return {"error": f"clear_envelope failed: {e}"}
         return {"status": "ok"}
+
+    # --- Session clip envelopes (clip_id = clip slot index) ---
+
+    @server.route("GET", "/live/tracks/{track_id}/clips/{clip_id}/envelopes")
+    def list_session_envelopes(track_id, clip_id, body=None):
+        return _env_list(track_id, clip_id, False)
+
+    @server.route("GET", "/live/tracks/{track_id}/clips/{clip_id}/envelopes/{device_id}/{param_name}")
+    def get_session_envelope_events(track_id, clip_id, device_id, param_name, body=None):
+        return _env_events(track_id, clip_id, device_id, param_name, body, False)
+
+    @server.route("POST", "/live/tracks/{track_id}/clips/{clip_id}/envelopes/{device_id}/{param_name}/insert")
+    def insert_session_envelope_step(track_id, clip_id, device_id, param_name, body=None):
+        return _env_insert(track_id, clip_id, device_id, param_name, body, False)
+
+    @server.route("DELETE", "/live/tracks/{track_id}/clips/{clip_id}/envelopes/{device_id}/{param_name}/range")
+    def delete_session_envelope_range(track_id, clip_id, device_id, param_name, body=None):
+        return _env_delete_range(track_id, clip_id, device_id, param_name, body, False)
+
+    @server.route("DELETE", "/live/tracks/{track_id}/clips/{clip_id}/envelopes/{device_id}/{param_name}")
+    def clear_session_envelope(track_id, clip_id, device_id, param_name, body=None):
+        return _env_clear(track_id, clip_id, device_id, param_name, False)
+
+    # --- Arrangement clip envelopes (addressed by start_time, like every other
+    #     arrangement route). Unlike Session clips, an arrangement clip's envelope
+    #     spans the clip's whole length, so it can express a long-form arc. ---
+
+    @server.route("GET", "/live/tracks/{track_id}/arrangement_clips/{start_time}/envelopes")
+    def list_arrangement_envelopes(track_id, start_time, body=None):
+        return _env_list(track_id, start_time, True)
+
+    @server.route("GET", "/live/tracks/{track_id}/arrangement_clips/{start_time}/envelopes/{device_id}/{param_name}")
+    def get_arrangement_envelope_events(track_id, start_time, device_id, param_name, body=None):
+        return _env_events(track_id, start_time, device_id, param_name, body, True)
+
+    @server.route("POST", "/live/tracks/{track_id}/arrangement_clips/{start_time}/envelopes/{device_id}/{param_name}/insert")
+    def insert_arrangement_envelope_step(track_id, start_time, device_id, param_name, body=None):
+        return _env_insert(track_id, start_time, device_id, param_name, body, True)
+
+    @server.route("DELETE", "/live/tracks/{track_id}/arrangement_clips/{start_time}/envelopes/{device_id}/{param_name}/range")
+    def delete_arrangement_envelope_range(track_id, start_time, device_id, param_name, body=None):
+        return _env_delete_range(track_id, start_time, device_id, param_name, body, True)
+
+    @server.route("DELETE", "/live/tracks/{track_id}/arrangement_clips/{start_time}/envelopes/{device_id}/{param_name}")
+    def clear_arrangement_envelope(track_id, start_time, device_id, param_name, body=None):
+        return _env_clear(track_id, start_time, device_id, param_name, True)

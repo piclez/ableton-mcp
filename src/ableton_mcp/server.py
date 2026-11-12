@@ -745,6 +745,28 @@ async def create_midi_clip(track_id: int, length: float = 4.0, name: str = "") -
 
 
 @mcp.tool()
+async def load_sample_to_slot(track_id: int, clip_id: int, path: str) -> dict:
+    """Load an audio file from Live's browser into an audio track's clip slot.
+
+    This is the ONLY way to get an audio file onto a track — Live's API has no
+    "create audio clip from file path". The file must already live somewhere the
+    browser indexes, e.g. ~/Music/Ableton/User Library/Samples/.
+
+    track_id: int — must be an AUDIO track (type "audio" in list_tracks()).
+    clip_id: int — clip slot index; the slot must be EMPTY.
+    path: str — sample filename, e.g. "Frequency_C3_ref.wav" (the stem alone also
+                matches). Searches user_library -> user_folders -> samples -> packs.
+    Returns {"status": "ok", "sample": str, ...clip info}.
+    On failure: {"error": "sample '...' not found in browser"} — check the file is
+    in the User Library and that Live's browser has indexed it.
+    """
+    return await client.post(
+        f"/live/tracks/{track_id}/clips/{clip_id}/load_sample",
+        {"path": path},
+    )
+
+
+@mcp.tool()
 async def rename_clip(track_id: int, clip_id: int, name: str) -> dict:
     """Rename a clip. Returns {"status": "ok", "name": str}."""
     return await client.post(
@@ -1472,6 +1494,88 @@ async def get_clip_envelope_events(
     """
     return await client.get(
         f"/live/tracks/{track_id}/clips/{clip_id}/envelopes/{device_id}/{param_name}"
+    )
+
+
+@mcp.tool()
+async def list_arrangement_clip_envelopes(track_id: int, start_time: float) -> dict:
+    """List automation envelopes on an ARRANGEMENT clip.
+
+    track_id: int — from list_tracks().
+    start_time: float — the clip's start_time from list_arrangement_clips(). That is the
+                only identifier arrangement clips have, and it changes if the clip is moved.
+    Returns {"envelopes": [{"param_name", "device_name", "device_id"}]}.
+    """
+    return await client.get(
+        f"/live/tracks/{track_id}/arrangement_clips/{start_time}/envelopes"
+    )
+
+
+@mcp.tool()
+async def get_arrangement_clip_envelope_events(
+    track_id: int, start_time: float, device_id: int, param_name: str
+) -> dict:
+    """Read automation points from an ARRANGEMENT clip envelope.
+
+    Returns {"has_envelope": bool, "events": [{"time": float, "value": float}]}.
+    """
+    return await client.get(
+        f"/live/tracks/{track_id}/arrangement_clips/{start_time}/envelopes/{device_id}/{param_name}"
+    )
+
+
+@mcp.tool()
+async def insert_arrangement_clip_envelope_step(
+    track_id: int,
+    start_time: float,
+    device_id: int,
+    param_name: str,
+    time: float,
+    value: float,
+    duration: float = 0.0,
+) -> dict:
+    """Insert an automation point into an ARRANGEMENT clip envelope.
+
+    Unlike a Session clip envelope, which repeats every loop, an arrangement clip's
+    envelope spans the clip's whole length — so this is how you write a long-form arc.
+
+    start_time: float — the clip's start_time from list_arrangement_clips().
+    time: float — beat position within the clip.
+    value: float — raw value in the parameter's [min, max] range.
+    duration: float — step width. IMPORTANT: 0.0 inserts a zero-width step that is
+              inaudible. For a continuous curve, set duration to reach the next
+              breakpoint (next_time - time).
+    Returns {"status": "ok"}.
+    """
+    return await client.post(
+        f"/live/tracks/{track_id}/arrangement_clips/{start_time}/envelopes/{device_id}/{param_name}/insert",
+        {"time": time, "value": value, "duration": duration},
+    )
+
+
+@mcp.tool()
+async def delete_arrangement_clip_envelope_range(
+    track_id: int,
+    start_time: float,
+    device_id: int,
+    param_name: str,
+    from_time: float | None = None,
+    to_time: float | None = None,
+) -> dict:
+    """Delete automation points from an ARRANGEMENT clip envelope.
+
+    Note: deleting an envelope does NOT reset the parameter — it stays at the last
+    automated value. Set it explicitly afterwards.
+    Returns {"status": "ok"}.
+    """
+    body: dict = {}
+    if from_time is not None:
+        body["from_time"] = from_time
+    if to_time is not None:
+        body["to_time"] = to_time
+    return await client.delete(
+        f"/live/tracks/{track_id}/arrangement_clips/{start_time}/envelopes/{device_id}/{param_name}/range",
+        body,
     )
 
 
