@@ -71,7 +71,7 @@ Here's what you can ask Claude:
 
 ## Architecture
 
-The Control Surface runs inside Ableton's embedded Python 3.11 (stdlib only, no pip). It starts a local HTTP server on port 39991 in a daemon thread; all Live API calls are scheduled back to the main thread via `_ControlSurface__component_guard`. The external MCP server communicates with it over HTTP using `httpx`.
+The Control Surface runs inside Ableton's embedded Python 3.11 (stdlib only, no pip). It starts a local HTTP server on port 8765 (override with `ABLETON_HTTP_PORT`) in a daemon thread; all Live API calls are scheduled back to the main thread via `_ControlSurface__component_guard`. The external MCP server communicates with it over HTTP using `httpx`.
 
 ## License
 

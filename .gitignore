@@ -5,3 +5,8 @@ build/
 # Reference files (not part of project)
 ableton*.md
 install.sh
+
+__pycache__/
+*.pyc
+.venv/
+venv/
