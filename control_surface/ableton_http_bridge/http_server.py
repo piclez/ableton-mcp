@@ -6,13 +6,17 @@ Runs in a daemon thread to avoid blocking Ableton's main thread.
 
 import json
 import logging
+import os
 import queue
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import unquote
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PORT = 8765
+# Override with ABLETON_HTTP_PORT to run alongside another control surface that
+# also binds 8765.
+DEFAULT_PORT = int(os.environ.get("ABLETON_HTTP_PORT", "8765"))
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -28,7 +32,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         self._handle("DELETE")
 
     def _handle(self, method):
-        path = self.path.split("?")[0].rstrip("/")
+        # Unquote per segment: parameter names contain spaces ("1 Filter Type A")
+        # and arrive percent-encoded, which would never match the route table.
+        raw = self.path.split("?")[0].rstrip("/")
+        path = "/".join(unquote(seg) for seg in raw.split("/"))
         body = self._read_body()
 
         handler, params = self.server.router.match(method, path)
