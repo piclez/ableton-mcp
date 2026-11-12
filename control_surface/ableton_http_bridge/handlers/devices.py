@@ -2,6 +2,8 @@
 
 from ableton.v3.live import util
 
+from . import browser_util
+
 
 def _get_track(track_id):
     tracks = list(util.song().tracks)
@@ -453,34 +455,7 @@ def register(server):
         song.view.selected_track = track
         app = Live.Application.get_application()
         browser = app.browser
-        filename = path.split("/")[-1].lower()
-        def _matches(item):
-            return item.name.lower() == filename or item.name.lower() == filename.rsplit(".", 1)[0].lower()
-        def _bfs(root, max_depth=5):
-            from collections import deque
-            queue = deque([(root, 0)])
-            while queue:
-                item, depth = queue.popleft()
-                try:
-                    if item.is_loadable and _matches(item):
-                        return item
-                except Exception:
-                    pass
-                if depth < max_depth:
-                    try:
-                        for child in item.children:
-                            queue.append((child, depth + 1))
-                    except Exception:
-                        pass
-            return None
-        found = None
-        for root in [browser.user_library, browser.user_folders, browser.samples, browser.packs]:
-            try:
-                found = _bfs(root)
-            except Exception:
-                pass
-            if found:
-                break
+        found = browser_util.find_sample(browser, path)
         if found is None:
             return {"error": f"sample '{path}' not found in browser"}
         # Select the pad's chain in the view so load_item targets this pad

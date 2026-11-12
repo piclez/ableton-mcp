@@ -2,6 +2,8 @@
 
 from ableton.v3.live import util
 
+from . import browser_util
+
 
 def _get_track(track_id):
     tracks = list(util.song().tracks)
@@ -110,6 +112,42 @@ def register(server):
                     slot.clip.name = name
                 return {"status": "ok", **_clip_info(i, slot)}
         return {"error": "no empty clip slot"}
+
+    @server.route("POST", "/live/tracks/{track_id}/clips/{clip_id}/load_sample")
+    def load_sample(track_id, clip_id, body=None):
+        """Load an audio file from Live's browser into an empty audio clip slot.
+
+        Live's API has no "create clip from file path", so this uses the only
+        supported route: highlight the target slot, then browser.load_item().
+        The file must live somewhere the browser indexes (e.g. User Library).
+        """
+        import Live
+        path = (body or {}).get("path", "").strip()
+        if not path:
+            return {"error": "missing 'path'"}
+        track, slot, _ = _get_clip(track_id, clip_id)
+        if track is None:
+            return {"error": f"track {track_id} not found"}
+        if slot is None:
+            return {"error": f"clip slot {clip_id} not found on track {track_id}"}
+        if track.has_midi_input:
+            return {"error": "only audio tracks can load samples into clip slots"}
+        if slot.has_clip:
+            return {"error": f"clip slot {clip_id} already has a clip"}
+        browser = Live.Application.get_application().browser
+        found = browser_util.find_sample(browser, path)
+        if found is None:
+            return {"error": f"sample '{path}' not found in browser"}
+        song = util.song()
+        song.view.selected_track = track
+        song.view.highlighted_clip_slot = slot
+        try:
+            browser.load_item(found)
+        except Exception as e:
+            return {"error": f"load_item failed: {e}"}
+        if not slot.has_clip:
+            return {"error": "load completed but no clip was created in the slot"}
+        return {"status": "ok", "sample": path, **_clip_info(clip_id, slot)}
 
     @server.route("POST", "/live/tracks/{track_id}/clips/{clip_id}/name")
     def set_name(track_id, clip_id, body=None):
